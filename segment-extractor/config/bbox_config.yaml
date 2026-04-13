@@ -1,0 +1,55 @@
+# Bounding Box Configuration for SmartRoute
+
+bounding_box:
+  # Bounding box coordinates (decimal degrees)
+  # Entire HCMC area
+  north: 11.00000        # Northern boundary
+  south: 10.70000        # Southern boundary
+  west: 106.60000        # Western boundary
+  east: 107.00000        # Eastern boundary
+  name: "Ho Chi Minh City - Full"
+
+  # Calculated properties
+  height_km: 33.4          # North-south distance
+  width_km: 44.4           # East-west distance
+  area_sqkm: 1483.0         # Total area
+
+# Data paths
+data:
+  # Path to research-traffic-AI training data
+  research_data_path: "../ref app/data traffic hcm/data1/train.csv"
+
+  # Output directory for extracted segments
+  output_dir: "output"
+
+# Overpass API configuration (for node resolution)
+overpass:
+  api_url: "https://overpass-api.de/api/interpreter"
+  rate_limit_delay: 1.0   # Delay between API calls (seconds)
+  timeout: 30             # Request timeout (seconds)
+  batch_size: 1000        # Process nodes in batches
+
+# Extraction settings
+extraction:
+  # Maximum segments to extract (for PoC, set lower number)
+  max_segments: 10027  # ALL segments - no limit
+
+  # Minimum segment length to include (meters)
+  min_length: 0
+
+  # Maximum segment length to include (meters)
+  max_length: 99999
+
+  # Priority street levels (1=highest, 4=lowest)
+  priority_levels: [1, 2, 3, 4]  # ALL levels
+
+# Output format
+output:
+  # Include full segment data in JSON
+  include_full_data: true
+
+  # Generate traffic_scraper configuration
+  generate_scraper_config: true
+
+  # Sort segments by traffic volume (descending)
+  sort_by_traffic: true
