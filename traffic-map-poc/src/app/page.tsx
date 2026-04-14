@@ -3,9 +3,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import MapView from '@/components/Map';
+import RouteControls from '@/components/RouteControls';
+import RouteLayer from '@/components/RouteLayer';
+import RouteSummaryPanel from '@/components/RouteSummaryPanel';
 import TrafficOverlay from '@/components/TrafficOverlay';
 import TimePicker, { TimeSelection } from '@/components/TimePicker';
-import { useTrafficSegments } from '@/lib/useTrafficSegments';
+import { useMapPicking, useRouteState, useTrafficSegments } from '@/lib';
 
 export default function Home() {
   const [map, setMap] = useState<maplibregl.Map | null>(null);
@@ -23,6 +26,26 @@ export default function Home() {
     updateZoom,
     canHoverDetails,
   } = useTrafficSegments(map, timeSelection, { minZoomForDetails: 14 });
+  const {
+    origin,
+    destination,
+    route,
+    pickingMode,
+    routeLoading,
+    routeError,
+    canRequestRoute,
+    beginPicking,
+    cancelPicking,
+    setPoint,
+    requestRoute,
+    clearRoute,
+  } = useRouteState();
+
+  useMapPicking({
+    map,
+    pickingMode,
+    onPick: setPoint,
+  });
 
   const handleMapLoad = (mapInstance: maplibregl.Map) => {
     setMap(mapInstance);
@@ -254,13 +277,44 @@ export default function Home() {
         <TrafficOverlay map={map} segments={segments} timeSelection={timeSelection} />
       )}
 
+      {map && (
+        <RouteLayer
+          map={map}
+          origin={origin}
+          destination={destination}
+          route={route}
+        />
+      )}
+
+      {!error && (
+        <RouteControls
+          origin={origin}
+          destination={destination}
+          pickingMode={pickingMode}
+          routeLoading={routeLoading}
+          canRequestRoute={canRequestRoute}
+          onBeginPicking={beginPicking}
+          onCancelPicking={cancelPicking}
+          onRequestRoute={requestRoute}
+          onClearRoute={clearRoute}
+        />
+      )}
+
       {!error && <TimePicker value={timeSelection} onChange={setTimeSelection} />}
+
+      {!error && (
+        <RouteSummaryPanel
+          route={route}
+          routeError={routeError}
+          pickingMode={pickingMode}
+        />
+      )}
 
       {!error && segments.length > 0 && (
         <div
           style={{
             position: 'absolute',
-            bottom: isPrediction ? 200 : 100,
+            bottom: isPrediction ? 210 : 110,
             left: 10,
             background: 'rgba(255, 255, 255, 0.95)',
             padding: '12px 16px',
