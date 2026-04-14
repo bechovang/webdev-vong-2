@@ -6,6 +6,8 @@ import MapView from '@/components/Map';
 import RouteControls from '@/components/RouteControls';
 import RouteLayer from '@/components/RouteLayer';
 import RouteSummaryPanel from '@/components/RouteSummaryPanel';
+import { SearchBox, SearchLocationMarker } from '@/components/SearchBox';
+import type { LonLat } from '@/components/SearchBox';
 import TrafficOverlay from '@/components/TrafficOverlay';
 import TimePicker, { TimeSelection } from '@/components/TimePicker';
 import { useMapPicking, useRouteState, useTrafficSegments } from '@/lib';
@@ -14,7 +16,10 @@ export default function Home() {
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [error] = useState<string | null>(null);
   const [timeSelection, setTimeSelection] = useState<TimeSelection>({ type: 'preset', horizon: 'now' });
+  const [mapCenter, setMapCenter] = useState<[number, number]>([106.6922, 10.7769]);
+  const [searchLocation, setSearchLocation] = useState<{ coords: LonLat; label: string } | null>(null);
   const mapInitialized = useRef(false);
+  const mapRef = useRef<maplibregl.Map | null>(null);
   const viewportSetupRef = useRef(false);
 
   const {
@@ -50,6 +55,7 @@ export default function Home() {
 
   const handleMapLoad = (mapInstance: maplibregl.Map) => {
     setMap(mapInstance);
+    mapRef.current = mapInstance;
     mapInitialized.current = true;
 
     mapInstance.fitBounds(
@@ -61,6 +67,11 @@ export default function Home() {
     );
 
     updateZoom(mapInstance.getZoom());
+
+    mapInstance.on('moveend', () => {
+      const c = mapInstance.getCenter();
+      setMapCenter([c.lng, c.lat]);
+    });
   };
 
   useEffect(() => {
@@ -214,6 +225,21 @@ export default function Home() {
         </div>
       </div>
 
+      {!error && (
+        <div style={{
+          position: 'absolute', top: 70, left: 16, right: 16, zIndex: 2100,
+          maxWidth: 480,
+        }}>
+          <SearchBox
+            mapCenter={mapCenter}
+            onSelect={(coords, label) => {
+              setSearchLocation({ coords, label });
+              mapRef.current?.flyTo({ center: coords, zoom: 15, duration: 1000 });
+            }}
+          />
+        </div>
+      )}
+
       {loading && segments.length === 0 && (
         <div
           style={{
@@ -306,6 +332,21 @@ export default function Home() {
 
       {map && segments.length > 0 && (
         <TrafficOverlay map={map} segments={segments} timeSelection={timeSelection} />
+      )}
+
+      {map && searchLocation && (
+        <SearchLocationMarker
+          map={map}
+          coords={searchLocation.coords}
+          label={searchLocation.label}
+          segments={segments}
+          onRouteHere={() => {
+            setPoint('destination', searchLocation.coords);
+            beginPicking('origin');
+            setSearchLocation(null);
+          }}
+          onClose={() => setSearchLocation(null)}
+        />
       )}
 
       {map && (
