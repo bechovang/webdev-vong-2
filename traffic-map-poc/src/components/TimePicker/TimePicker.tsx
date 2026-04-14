@@ -229,17 +229,25 @@ export const TimePicker: React.FC<TimePickerProps> = ({
               <button
                 key={time.label}
                 onClick={() => {
-                  setCustomHour(time.hour);
-                  setCustomMinute(time.minute);
+                  const now = new Date();
+                  const customTime = new Date();
+                  customTime.setHours(time.hour);
+                  customTime.setMinutes(time.minute);
+                  customTime.setSeconds(0);
+                  if (customTime < now) {
+                    customTime.setDate(customTime.getDate() + 1);
+                  }
+                  onChange({ type: 'custom', customTime });
+                  setShowCustomPicker(false);
                 }}
                 style={{
                   padding: '8px 12px',
                   borderRadius: 8,
                   border: '1px solid #e0e0e0',
-                  background: customHour === time.hour && customMinute === time.minute
+                  background: value.type === 'custom' && value.customTime?.getHours() === time.hour && value.customTime?.getMinutes() === time.minute
                     ? '#1976d2'
                     : 'white',
-                  color: customHour === time.hour && customMinute === time.minute
+                  color: value.type === 'custom' && value.customTime?.getHours() === time.hour && value.customTime?.getMinutes() === time.minute
                     ? 'white'
                     : '#333',
                   fontSize: 12,

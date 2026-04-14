@@ -53,6 +53,8 @@ export interface RouteRequest {
   destination: Coordinate;
   profile?: RouteProfile;
   departureOffsetMinutes?: DepartureOffsetMinutes;
+  targetHour?: number;
+  targetWeekday?: number;
   includeSteps?: boolean;
   includePredictionAnalysis?: boolean;
 }

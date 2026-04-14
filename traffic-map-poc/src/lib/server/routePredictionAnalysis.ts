@@ -30,7 +30,9 @@ interface PredictedSegmentScore extends TrafficSegmentRecord {
 
 export async function analyzeRoutePrediction(
   route: RouteData,
-  departureOffsetMinutes: DepartureOffsetMinutes
+  departureOffsetMinutes: DepartureOffsetMinutes,
+  targetHour?: number,
+  targetWeekday?: number
 ): Promise<PredictionAnalysis> {
   // Use wider padding for long routes to capture more traffic segments
   const routeLengthMeters = calculateRouteLength(route.geometry.coordinates);
@@ -48,7 +50,9 @@ export async function analyzeRoutePrediction(
     nearbySegments,
     route,
     departureOffsetMinutes,
-    maxSegments
+    maxSegments,
+    targetHour,
+    targetWeekday
   );
 
   // Calculate coverage metrics
@@ -132,7 +136,9 @@ function scoreSegmentAgainstRoute(
   segment: TrafficSegmentRecord,
   route: RouteData,
   departureOffsetMinutes: DepartureOffsetMinutes,
-  precomputedDistance?: number
+  precomputedDistance?: number,
+  targetHour?: number,
+  targetWeekday?: number
 ): PredictedSegmentScore | null {
   const distanceToRouteMeters = precomputedDistance ?? getDistanceToRoute(
     [(segment.s_lng + segment.e_lng) / 2, (segment.s_lat + segment.e_lat) / 2],
@@ -143,7 +149,7 @@ function scoreSegmentAgainstRoute(
     return null;
   }
 
-  const predicted = predictSegmentTraffic(segment, departureOffsetMinutes);
+  const predicted = predictSegmentTraffic(segment, departureOffsetMinutes, targetHour, targetWeekday);
   const baseSpeedMetersPerSecond = Math.max((segment.max_velocity || 20) / 3.6, 1.8);
   const baseDurationSeconds = Math.max((segment.length || 30) / baseSpeedMetersPerSecond, 4);
   const predictedDelaySeconds = Math.round(baseDurationSeconds * (predicted.travelTimeFactor - 1));
@@ -158,10 +164,15 @@ function scoreSegmentAgainstRoute(
   };
 }
 
-function predictSegmentTraffic(segment: TrafficSegmentRecord, departureOffsetMinutes: DepartureOffsetMinutes) {
-  const targetTime = new Date(Date.now() + departureOffsetMinutes * 60 * 1000);
-  const hour = targetTime.getHours();
-  const weekday = targetTime.getDay();
+function predictSegmentTraffic(segment: TrafficSegmentRecord, departureOffsetMinutes: DepartureOffsetMinutes, targetHour?: number, targetWeekday?: number) {
+  const hour = targetHour ?? (() => {
+    const t = new Date(Date.now() + departureOffsetMinutes * 60 * 1000);
+    return t.getHours();
+  })();
+  const weekday = targetWeekday ?? (() => {
+    const t = new Date(Date.now() + departureOffsetMinutes * 60 * 1000);
+    return t.getDay();
+  })();
   const isWeekend = weekday === 0 || weekday === 6;
   const isRushHour = (hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19);
   const isNight = hour >= 22 || hour <= 6;
@@ -287,7 +298,9 @@ function findNearestSegmentsForSamples(
   nearbySegments: TrafficSegmentRecord[],
   route: RouteData,
   departureOffsetMinutes: DepartureOffsetMinutes,
-  maxSegments: number
+  maxSegments: number,
+  targetHour?: number,
+  targetWeekday?: number
 ): PredictedSegmentScore[] {
   if (nearbySegments.length === 0 || samplePoints.length === 0) {
     return [];
@@ -365,7 +378,7 @@ function findNearestSegmentsForSamples(
   // Score and sort
   return Array.from(segmentMatches.values())
     .map(({ segment, distance }) =>
-      scoreSegmentAgainstRoute(segment, route, departureOffsetMinutes, distance)
+      scoreSegmentAgainstRoute(segment, route, departureOffsetMinutes, distance, targetHour, targetWeekday)
     )
     .filter((seg): seg is PredictedSegmentScore => seg !== null)
     .sort((a, b) => a.distanceToRouteMeters - b.distanceToRouteMeters)

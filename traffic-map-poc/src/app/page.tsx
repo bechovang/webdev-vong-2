@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import MapView from '@/components/Map';
 import RouteControls from '@/components/RouteControls';
@@ -118,6 +118,26 @@ export default function Home() {
             ? 60
             : 0
       : getNearestDepartureOffsetMinutes(timeSelection.customTime);
+
+  const targetHour = useMemo(() => {
+    if (timeSelection.type === 'preset') {
+      const now = new Date();
+      const horizon = timeSelection.horizon || 'now';
+      const offset = horizon === 'now' ? 0 : parseInt(horizon.slice(1), 10);
+      return new Date(now.getTime() + offset * 60 * 1000).getHours();
+    }
+    return timeSelection.customTime?.getHours();
+  }, [timeSelection]);
+
+  const targetWeekday = useMemo(() => {
+    if (timeSelection.type === 'preset') {
+      const now = new Date();
+      const horizon = timeSelection.horizon || 'now';
+      const offset = horizon === 'now' ? 0 : parseInt(horizon.slice(1), 10);
+      return new Date(now.getTime() + offset * 60 * 1000).getDay();
+    }
+    return timeSelection.customTime?.getDay();
+  }, [timeSelection]);
 
   return (
     <main style={{ width: '100vw', height: '100vh', overflow: 'hidden' }}>
@@ -308,7 +328,7 @@ export default function Home() {
           canRequestRoute={canRequestRoute}
           onBeginPicking={beginPicking}
           onCancelPicking={cancelPicking}
-          onRequestRoute={() => requestRoute(departureOffsetMinutes)}
+          onRequestRoute={() => requestRoute({ departureOffsetMinutes, targetHour, targetWeekday })}
           onClearRoute={clearRoute}
         />
       )}

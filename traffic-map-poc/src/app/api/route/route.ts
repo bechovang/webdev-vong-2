@@ -17,6 +17,8 @@ export async function POST(request: Request) {
       destination,
       profile = 'car',
       departureOffsetMinutes = 0,
+      targetHour,
+      targetWeekday,
       includeSteps = true,
       includePredictionAnalysis = false,
     } = body;
@@ -47,7 +49,7 @@ export async function POST(request: Request) {
     });
 
     const predictionAnalysis = includePredictionAnalysis
-      ? await analyzeRoutePrediction(route, departureOffsetMinutes)
+      ? await analyzeRoutePrediction(route, departureOffsetMinutes, targetHour, targetWeekday)
       : undefined;
 
     return NextResponse.json({

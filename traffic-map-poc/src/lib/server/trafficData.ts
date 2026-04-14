@@ -39,6 +39,23 @@ interface Bounds {
 let nodesCache: Map<number, Node> | null = null;
 let segmentsCache: SegmentRaw[] | null = null;
 
+/**
+ * Read CSV file - uses fs.readFile locally, fetch on Vercel
+ */
+async function readCSV(filename: string): Promise<string> {
+  if (process.env.VERCEL) {
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : `http://localhost:${process.env.PORT || 3000}`;
+    const response = await fetch(`${baseUrl}/data/${filename}`);
+    if (!response.ok) throw new Error(`Failed to fetch ${filename}: ${response.status}`);
+    return response.text();
+  }
+
+  const csvPath = join(process.cwd(), 'public', 'data', filename);
+  return readFile(csvPath, 'utf-8');
+}
+
 export async function getTrafficSegmentsWithinBounds(bounds: Bounds) {
   const [nodeMap, segments] = await Promise.all([
     loadNodes(),
@@ -103,8 +120,7 @@ async function loadNodes(): Promise<Map<number, Node>> {
     return nodesCache;
   }
 
-  const csvPath = join(process.cwd(), 'data', 'nodes.csv');
-  const csvContent = await readFile(csvPath, 'utf-8');
+  const csvContent = await readCSV('nodes.csv');
   const lines = csvContent.split('\n');
   const nodeMap = new Map<number, Node>();
 
@@ -130,8 +146,7 @@ async function loadSegmentsRaw(): Promise<SegmentRaw[]> {
     return segmentsCache;
   }
 
-  const csvPath = join(process.cwd(), 'data', 'segments.csv');
-  const csvContent = await readFile(csvPath, 'utf-8');
+  const csvContent = await readCSV('segments.csv');
   const lines = csvContent.split('\n');
   const segments: SegmentRaw[] = [];
 

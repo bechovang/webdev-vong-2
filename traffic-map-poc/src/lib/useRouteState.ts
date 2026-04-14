@@ -22,7 +22,7 @@ interface UseRouteStateResult {
   beginPicking: (mode: Exclude<PickingMode, null>) => void;
   cancelPicking: () => void;
   setPoint: (mode: Exclude<PickingMode, null>, coordinate: Coordinate) => void;
-  requestRoute: (departureOffsetMinutes: DepartureOffsetMinutes) => Promise<void>;
+  requestRoute: (params: { departureOffsetMinutes: DepartureOffsetMinutes; targetHour?: number; targetWeekday?: number }) => Promise<void>;
   clearRoute: () => void;
 }
 
@@ -67,7 +67,7 @@ export function useRouteState(): UseRouteStateResult {
     setRouteError(null);
   }, []);
 
-  const requestRoute = useCallback(async (departureOffsetMinutes: DepartureOffsetMinutes) => {
+  const requestRoute = useCallback(async (params: { departureOffsetMinutes: DepartureOffsetMinutes; targetHour?: number; targetWeekday?: number }) => {
     if (!origin || !destination) {
       setRouteError('Pick both start and end points first.');
       return;
@@ -86,7 +86,9 @@ export function useRouteState(): UseRouteStateResult {
           origin,
           destination,
           profile: 'car',
-          departureOffsetMinutes,
+          departureOffsetMinutes: params.departureOffsetMinutes,
+          targetHour: params.targetHour,
+          targetWeekday: params.targetWeekday,
           includeSteps: true,
           includePredictionAnalysis: true,
         }),
