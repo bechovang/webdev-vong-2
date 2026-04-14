@@ -6,6 +6,7 @@ import { Coordinate, PickingMode } from '@/lib/routing';
 interface RouteControlsProps {
   origin: Coordinate | null;
   destination: Coordinate | null;
+  hasRoute: boolean;
   pickingMode: PickingMode;
   routeLoading: boolean;
   canRequestRoute: boolean;
@@ -26,6 +27,7 @@ function formatCoordinate(label: string, coordinate: Coordinate | null) {
 export const RouteControls: React.FC<RouteControlsProps> = ({
   origin,
   destination,
+  hasRoute,
   pickingMode,
   routeLoading,
   canRequestRoute,
@@ -39,8 +41,8 @@ export const RouteControls: React.FC<RouteControlsProps> = ({
       style={{
         position: 'absolute',
         top: 80,
-        left: '50%',
-        transform: 'translateX(-50%)',
+        left: hasRoute ? 10 : '50%',
+        transform: hasRoute ? 'none' : 'translateX(-50%)',
         zIndex: 1600,
         width: 'min(560px, calc(100vw - 24px))',
         background: 'rgba(255, 255, 255, 0.96)',

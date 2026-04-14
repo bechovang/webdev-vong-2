@@ -117,6 +117,11 @@ export const RouteSummaryPanel: React.FC<RouteSummaryPanelProps> = ({
                   {predictionAnalysis.summary}
                 </div>
               )}
+              {!!predictionAnalysis.congestedSegments?.length && (
+                <div style={{ fontSize: 12, color: '#334155', lineHeight: 1.6, marginTop: 10, fontWeight: 600 }}>
+                  {predictionAnalysis.congestedSegments.length} congested route segments are highlighted on the map.
+                </div>
+              )}
             </div>
           )}
 

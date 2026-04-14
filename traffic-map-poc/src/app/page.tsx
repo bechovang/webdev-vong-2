@@ -294,6 +294,7 @@ export default function Home() {
           origin={origin}
           destination={destination}
           route={route}
+          predictionAnalysis={predictionAnalysis}
         />
       )}
 
@@ -301,6 +302,7 @@ export default function Home() {
         <RouteControls
           origin={origin}
           destination={destination}
+          hasRoute={Boolean(route)}
           pickingMode={pickingMode}
           routeLoading={routeLoading}
           canRequestRoute={canRequestRoute}

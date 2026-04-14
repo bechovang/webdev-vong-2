@@ -1,4 +1,5 @@
 import {
+  CongestedSegment,
   DepartureOffsetMinutes,
   PredictionAnalysis,
   RouteData,
@@ -68,6 +69,7 @@ export async function analyzeRoutePrediction(
     delaySeconds,
     congestionScore,
     riskLevel,
+    congestedSegments: buildCongestedSegments(matchedSegments),
     summary: buildSummary({
       departureOffsetMinutes,
       delaySeconds,
@@ -230,6 +232,33 @@ function getSeverityWeight(los: PredictedSegmentScore['los']) {
     case 'F':
       return 5;
   }
+}
+
+function buildCongestedSegments(matchedSegments: PredictedSegmentScore[]): CongestedSegment[] {
+  return matchedSegments
+    .filter((segment) => segment.los === 'D' || segment.los === 'E' || segment.los === 'F')
+    .sort((a, b) => {
+      const severityDiff = getSeverityWeight(b.los) - getSeverityWeight(a.los);
+      if (severityDiff !== 0) {
+        return severityDiff;
+      }
+
+      return b.predictedDelaySeconds - a.predictedDelaySeconds;
+    })
+    .slice(0, 12)
+    .map((segment) => ({
+      segmentId: segment.segment_id,
+      los: segment.los,
+      confidence: Number(segment.confidence.toFixed(2)),
+      delaySeconds: segment.predictedDelaySeconds,
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [segment.s_lng, segment.s_lat],
+          [segment.e_lng, segment.e_lat],
+        ],
+      },
+    }));
 }
 
 function buildSummary(params: {

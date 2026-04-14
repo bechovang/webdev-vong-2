@@ -86,7 +86,7 @@ export async function getGraphHopperRoute(params: {
     profile: params.profile,
     distanceMeters: Math.round(path.distance),
     durationSeconds: Math.round(path.time / 1000),
-    geometry: normalizeGeometry(path.points),
+    geometry: path.points,
     bbox: normalizeBbox(path.bbox),
     steps: params.includeSteps ? normalizeInstructions(path.instructions) : undefined,
   };
@@ -127,13 +127,6 @@ function mapGraphHopperError(status: number, payload: GraphHopperResponse) {
   }
 
   return new RouteApiError('provider_error', message);
-}
-
-function normalizeGeometry(geometry: GeoJSON.LineString): GeoJSON.LineString {
-  return {
-    type: 'LineString',
-    coordinates: geometry.coordinates.map((coordinate) => [coordinate[0], coordinate[1]]),
-  };
 }
 
 function normalizeBbox(bbox: [number, number, number, number]): [number, number, number, number] {
