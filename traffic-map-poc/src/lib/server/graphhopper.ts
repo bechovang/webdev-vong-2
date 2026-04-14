@@ -130,8 +130,8 @@ function mapGraphHopperError(status: number, payload: GraphHopperResponse) {
 }
 
 function normalizeBbox(bbox: [number, number, number, number]): [number, number, number, number] {
-  const [minLng, maxLat, maxLng, minLat] = bbox;
-  return [minLng, minLat, maxLng, maxLat];
+  // GraphHopper returns [minLon, minLat, maxLon, maxLat] — already the correct order
+  return bbox;
 }
 
 function normalizeInstructions(instructions: GraphHopperInstruction[] | undefined): RouteStep[] {

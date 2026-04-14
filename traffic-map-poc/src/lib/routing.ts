@@ -21,6 +21,13 @@ export interface CongestedSegment {
   geometry?: GeoJSON.LineString;
 }
 
+export interface PredictionCoverage {
+  matchedSegmentCount: number;
+  sampledPointCount: number;
+  coverageRatio: number;
+  level: 'low' | 'partial' | 'good';
+}
+
 export interface PredictionAnalysis {
   departureOffsetMinutes: DepartureOffsetMinutes;
   delaySeconds?: number;
@@ -28,6 +35,7 @@ export interface PredictionAnalysis {
   riskLevel?: 'low' | 'medium' | 'high';
   congestedSegments?: CongestedSegment[];
   summary?: string;
+  coverage?: PredictionCoverage;
 }
 
 export interface RouteData {

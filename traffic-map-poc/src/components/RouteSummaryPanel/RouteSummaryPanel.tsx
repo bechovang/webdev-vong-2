@@ -98,7 +98,27 @@ export const RouteSummaryPanel: React.FC<RouteSummaryPanelProps> = ({
                   {formatRiskLevel(predictionAnalysis.riskLevel)}
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+
+              {/* Coverage indicator */}
+              {predictionAnalysis.coverage && predictionAnalysis.coverage.level !== 'good' && (
+                <div style={{
+                  marginTop: 10,
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  background: getCoverageBackground(predictionAnalysis.coverage.level),
+                  fontSize: 11,
+                  color: getCoverageTextColor(predictionAnalysis.coverage.level),
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}>
+                  <span>{getCoverageIcon(predictionAnalysis.coverage.level)}</span>
+                  <span>Data coverage: {predictionAnalysis.coverage.level.toUpperCase()} ({predictionAnalysis.coverage.coverageRatio * 100}% of route sampled)</span>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: predictionAnalysis.coverage?.level !== 'good' ? 10 : 10 }}>
                 <div>
                   <div style={{ fontSize: 12, color: '#475569' }}>Delay estimate</div>
                   <div style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', marginTop: 2 }}>
@@ -190,6 +210,42 @@ function getRiskTextColor(riskLevel: PredictionAnalysis['riskLevel']) {
     case 'low':
     default:
       return '#047857';
+  }
+}
+
+function getCoverageBackground(coverageLevel: 'low' | 'partial' | 'good') {
+  switch (coverageLevel) {
+    case 'low':
+      return '#fef3c7';
+    case 'partial':
+      return '#f3e8ff';
+    case 'good':
+    default:
+      return '#ecfdf5';
+  }
+}
+
+function getCoverageTextColor(coverageLevel: 'low' | 'partial' | 'good') {
+  switch (coverageLevel) {
+    case 'low':
+      return '#b45309';
+    case 'partial':
+      return '#7c3aed';
+    case 'good':
+    default:
+      return '#047857';
+  }
+}
+
+function getCoverageIcon(coverageLevel: 'low' | 'partial' | 'good'): string {
+  switch (coverageLevel) {
+    case 'low':
+      return '⚠️';
+    case 'partial':
+      return '🔶';
+    case 'good':
+    default:
+      return '✓';
   }
 }
 
