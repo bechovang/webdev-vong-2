@@ -147,8 +147,8 @@ export const RouteSummaryPanel: React.FC<RouteSummaryPanelProps> = ({
 
           <div style={{ marginTop: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 10 }}>Steps</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {(route.steps || []).slice(0, 5).map((step, index) => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 280, overflowY: 'auto' }}>
+              {(route.steps || []).map((step, index) => (
                 <div key={`${step.instruction}-${index}`} style={stepRowStyle}>
                   <div style={stepIndexStyle}>{index + 1}</div>
                   <div>
