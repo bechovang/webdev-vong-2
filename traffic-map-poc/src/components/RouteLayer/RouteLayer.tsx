@@ -283,31 +283,40 @@ export const RouteLayer: React.FC<RouteLayerProps> = ({
             d={routeScreenPath}
             fill="none"
             stroke="#ffffff"
-            strokeWidth="12"
+            strokeWidth="8"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
           <path
             d={routeScreenPath}
             fill="none"
-            stroke="#0047ff"
-            strokeWidth="8"
+            stroke="#2563eb"
+            strokeWidth="5"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
         </>
       )}
       {congestionScreenPaths.map((path, index) => (
-        <path
-          key={`${path}-${index}`}
-          d={path}
-          fill="none"
-          stroke="#dc2626"
-          strokeWidth="7"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeDasharray="8 8"
-        />
+        <g key={`${path}-${index}`}>
+          <path
+            d={path}
+            fill="none"
+            stroke="rgba(15, 23, 42, 0.28)"
+            strokeWidth="8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d={path}
+            fill="none"
+            stroke="#d946ef"
+            strokeWidth="6.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray="10 7"
+          />
+        </g>
       ))}
     </svg>
   );
