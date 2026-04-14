@@ -94,7 +94,7 @@ export function useRouteState(): UseRouteStateResult {
 
       const data = (await response.json()) as RouteResponse;
       if (!response.ok || data.status !== 'success') {
-        throw new Error(data.error.message || 'Failed to build route');
+        throw new Error(('error' in data ? data.error?.message : null) || 'Failed to build route');
       }
 
       setRoute(data.data.route);
