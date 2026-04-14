@@ -7,6 +7,7 @@ import {
   RouteResponse,
 } from '@/lib/routing';
 import { getGraphHopperRoute, RouteApiError } from '@/lib/server/graphhopper';
+import { analyzeRoutePrediction } from '@/lib/server/routePredictionAnalysis';
 
 export async function POST(request: Request) {
   try {
@@ -45,15 +46,15 @@ export async function POST(request: Request) {
       includeSteps,
     });
 
+    const predictionAnalysis = includePredictionAnalysis
+      ? await analyzeRoutePrediction(route, departureOffsetMinutes)
+      : undefined;
+
     return NextResponse.json({
       status: 'success',
       data: {
         route,
-        predictionAnalysis: includePredictionAnalysis
-          ? {
-              departureOffsetMinutes,
-            }
-          : undefined,
+        predictionAnalysis,
       },
     } satisfies RouteResponse);
   } catch (error) {

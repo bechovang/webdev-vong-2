@@ -1,12 +1,20 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import { Coordinate, PickingMode, RouteData, RouteResponse } from './routing';
+import {
+  Coordinate,
+  DepartureOffsetMinutes,
+  PickingMode,
+  PredictionAnalysis,
+  RouteData,
+  RouteResponse,
+} from './routing';
 
 interface UseRouteStateResult {
   origin: Coordinate | null;
   destination: Coordinate | null;
   route: RouteData | null;
+  predictionAnalysis: PredictionAnalysis | null;
   pickingMode: PickingMode;
   routeLoading: boolean;
   routeError: string | null;
@@ -14,7 +22,7 @@ interface UseRouteStateResult {
   beginPicking: (mode: Exclude<PickingMode, null>) => void;
   cancelPicking: () => void;
   setPoint: (mode: Exclude<PickingMode, null>, coordinate: Coordinate) => void;
-  requestRoute: () => Promise<void>;
+  requestRoute: (departureOffsetMinutes: DepartureOffsetMinutes) => Promise<void>;
   clearRoute: () => void;
 }
 
@@ -22,6 +30,7 @@ export function useRouteState(): UseRouteStateResult {
   const [origin, setOrigin] = useState<Coordinate | null>(null);
   const [destination, setDestination] = useState<Coordinate | null>(null);
   const [route, setRoute] = useState<RouteData | null>(null);
+  const [predictionAnalysis, setPredictionAnalysis] = useState<PredictionAnalysis | null>(null);
   const [pickingMode, setPickingMode] = useState<PickingMode>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
@@ -44,6 +53,7 @@ export function useRouteState(): UseRouteStateResult {
 
     setPickingMode(null);
     setRoute(null);
+    setPredictionAnalysis(null);
     setRouteError(null);
   }, []);
 
@@ -51,12 +61,13 @@ export function useRouteState(): UseRouteStateResult {
     setOrigin(null);
     setDestination(null);
     setRoute(null);
+    setPredictionAnalysis(null);
     setPickingMode(null);
     setRouteLoading(false);
     setRouteError(null);
   }, []);
 
-  const requestRoute = useCallback(async () => {
+  const requestRoute = useCallback(async (departureOffsetMinutes: DepartureOffsetMinutes) => {
     if (!origin || !destination) {
       setRouteError('Pick both start and end points first.');
       return;
@@ -75,9 +86,9 @@ export function useRouteState(): UseRouteStateResult {
           origin,
           destination,
           profile: 'car',
-          departureOffsetMinutes: 0,
+          departureOffsetMinutes,
           includeSteps: true,
-          includePredictionAnalysis: false,
+          includePredictionAnalysis: true,
         }),
       });
 
@@ -87,8 +98,10 @@ export function useRouteState(): UseRouteStateResult {
       }
 
       setRoute(data.data.route);
+      setPredictionAnalysis(data.data.predictionAnalysis || null);
     } catch (error) {
       setRoute(null);
+      setPredictionAnalysis(null);
       setRouteError(error instanceof Error ? error.message : 'Failed to build route');
     } finally {
       setRouteLoading(false);
@@ -103,6 +116,7 @@ export function useRouteState(): UseRouteStateResult {
     origin,
     destination,
     route,
+    predictionAnalysis,
     pickingMode,
     routeLoading,
     routeError,

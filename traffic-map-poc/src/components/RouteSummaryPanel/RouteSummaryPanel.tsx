@@ -1,10 +1,11 @@
 'use client';
 
 import React from 'react';
-import { PickingMode, RouteData } from '@/lib/routing';
+import { PickingMode, PredictionAnalysis, RouteData } from '@/lib/routing';
 
 interface RouteSummaryPanelProps {
   route: RouteData | null;
+  predictionAnalysis: PredictionAnalysis | null;
   routeError: string | null;
   pickingMode: PickingMode;
 }
@@ -30,6 +31,7 @@ function formatDuration(durationSeconds: number) {
 
 export const RouteSummaryPanel: React.FC<RouteSummaryPanelProps> = ({
   route,
+  predictionAnalysis,
   routeError,
   pickingMode,
 }) => {
@@ -86,6 +88,38 @@ export const RouteSummaryPanel: React.FC<RouteSummaryPanelProps> = ({
             </div>
           </div>
 
+          {predictionAnalysis && (
+            <div style={{ marginTop: 14, padding: '12px 14px', borderRadius: 12, background: getRiskBackground(predictionAnalysis.riskLevel) }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: getRiskTextColor(predictionAnalysis.riskLevel), textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Predicted traffic
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: getRiskTextColor(predictionAnalysis.riskLevel) }}>
+                  {formatRiskLevel(predictionAnalysis.riskLevel)}
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+                <div>
+                  <div style={{ fontSize: 12, color: '#475569' }}>Delay estimate</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', marginTop: 2 }}>
+                    {formatDelay(predictionAnalysis.delaySeconds)}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: '#475569' }}>Congestion score</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', marginTop: 2 }}>
+                    {formatCongestionScore(predictionAnalysis.congestionScore)}
+                  </div>
+                </div>
+              </div>
+              {predictionAnalysis.summary && (
+                <div style={{ fontSize: 12, color: '#334155', lineHeight: 1.6, marginTop: 10 }}>
+                  {predictionAnalysis.summary}
+                </div>
+              )}
+            </div>
+          )}
+
           <div style={{ marginTop: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 10 }}>Steps</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -112,6 +146,47 @@ export const RouteSummaryPanel: React.FC<RouteSummaryPanelProps> = ({
     </div>
   );
 };
+
+function formatDelay(delaySeconds: number | undefined) {
+  if (!delaySeconds || delaySeconds <= 0) {
+    return '+0 min';
+  }
+
+  return `+${Math.max(1, Math.round(delaySeconds / 60))} min`;
+}
+
+function formatCongestionScore(score: number | undefined) {
+  return score != null ? score.toFixed(2) : '0.00';
+}
+
+function formatRiskLevel(riskLevel: PredictionAnalysis['riskLevel']) {
+  if (!riskLevel) return 'Unknown';
+  return riskLevel[0].toUpperCase() + riskLevel.slice(1);
+}
+
+function getRiskBackground(riskLevel: PredictionAnalysis['riskLevel']) {
+  switch (riskLevel) {
+    case 'high':
+      return '#fef2f2';
+    case 'medium':
+      return '#fff7ed';
+    case 'low':
+    default:
+      return '#ecfdf5';
+  }
+}
+
+function getRiskTextColor(riskLevel: PredictionAnalysis['riskLevel']) {
+  switch (riskLevel) {
+    case 'high':
+      return '#b91c1c';
+    case 'medium':
+      return '#c2410c';
+    case 'low':
+    default:
+      return '#047857';
+  }
+}
 
 const metricCardStyle: React.CSSProperties = {
   background: '#eff6ff',

@@ -30,6 +30,7 @@ export default function Home() {
     origin,
     destination,
     route,
+    predictionAnalysis,
     pickingMode,
     routeLoading,
     routeError,
@@ -107,6 +108,16 @@ export default function Home() {
 
   const isPrediction = timeSelection.type !== 'preset' || timeSelection.horizon !== 'now';
   const canLoadDetails = currentZoom >= 14;
+  const departureOffsetMinutes =
+    timeSelection.type === 'preset'
+      ? timeSelection.horizon === '+15'
+        ? 15
+        : timeSelection.horizon === '+30'
+          ? 30
+          : timeSelection.horizon === '+60'
+            ? 60
+            : 0
+      : getNearestDepartureOffsetMinutes(timeSelection.customTime);
 
   return (
     <main style={{ width: '100vw', height: '100vh', overflow: 'hidden' }}>
@@ -295,7 +306,7 @@ export default function Home() {
           canRequestRoute={canRequestRoute}
           onBeginPicking={beginPicking}
           onCancelPicking={cancelPicking}
-          onRequestRoute={requestRoute}
+          onRequestRoute={() => requestRoute(departureOffsetMinutes)}
           onClearRoute={clearRoute}
         />
       )}
@@ -305,6 +316,7 @@ export default function Home() {
       {!error && (
         <RouteSummaryPanel
           route={route}
+          predictionAnalysis={predictionAnalysis}
           routeError={routeError}
           pickingMode={pickingMode}
         />
@@ -346,4 +358,19 @@ export default function Home() {
       )}
     </main>
   );
+}
+
+function getNearestDepartureOffsetMinutes(customTime?: Date) {
+  if (!customTime) {
+    return 0;
+  }
+
+  const diffMinutes = Math.max(0, Math.round((customTime.getTime() - Date.now()) / 60000));
+  const supportedOffsets = [0, 15, 30, 60] as const;
+
+  return supportedOffsets.reduce((closest, candidate) => {
+    return Math.abs(candidate - diffMinutes) < Math.abs(closest - diffMinutes)
+      ? candidate
+      : closest;
+  }, 0 as (typeof supportedOffsets)[number]);
 }
