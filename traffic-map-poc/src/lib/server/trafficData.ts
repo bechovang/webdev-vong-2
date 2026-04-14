@@ -103,7 +103,7 @@ async function loadNodes(): Promise<Map<number, Node>> {
     return nodesCache;
   }
 
-  const csvPath = join(process.cwd(), 'public', 'data', 'nodes.csv');
+  const csvPath = join(process.cwd(), 'data', 'nodes.csv');
   const csvContent = await readFile(csvPath, 'utf-8');
   const lines = csvContent.split('\n');
   const nodeMap = new Map<number, Node>();
@@ -130,7 +130,7 @@ async function loadSegmentsRaw(): Promise<SegmentRaw[]> {
     return segmentsCache;
   }
 
-  const csvPath = join(process.cwd(), 'public', 'data', 'segments.csv');
+  const csvPath = join(process.cwd(), 'data', 'segments.csv');
   const csvContent = await readFile(csvPath, 'utf-8');
   const lines = csvContent.split('\n');
   const segments: SegmentRaw[] = [];
