@@ -7,7 +7,7 @@ import RouteControls from '@/components/RouteControls';
 import RouteLayer from '@/components/RouteLayer';
 import RouteSummaryPanel from '@/components/RouteSummaryPanel';
 import { SearchBox, SearchLocationMarker } from '@/components/SearchBox';
-import type { LonLat } from '@/components/SearchBox';
+import type { LonLat, RoutePoint } from '@/components/SearchBox';
 import TrafficOverlay from '@/components/TrafficOverlay';
 import TimePicker, { TimeSelection } from '@/components/TimePicker';
 import { useMapPicking, useRouteState, useTrafficSegments } from '@/lib';
@@ -18,6 +18,7 @@ export default function Home() {
   const [timeSelection, setTimeSelection] = useState<TimeSelection>({ type: 'preset', horizon: 'now' });
   const [mapCenter, setMapCenter] = useState<[number, number]>([106.6922, 10.7769]);
   const [searchLocation, setSearchLocation] = useState<{ coords: LonLat; label: string } | null>(null);
+  const [routeDestination, setRouteDestination] = useState<RoutePoint | null>(null);
   const mapInitialized = useRef(false);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const viewportSetupRef = useRef(false);
@@ -236,6 +237,24 @@ export default function Home() {
               setSearchLocation({ coords, label });
               mapRef.current?.flyTo({ center: coords, zoom: 15, duration: 1000 });
             }}
+            onRoute={(origin, dest) => {
+              setPoint('origin', origin.coords);
+              setPoint('destination', dest.coords);
+              setRouteDestination(null);
+              requestRoute({ departureOffsetMinutes, targetHour, targetWeekday });
+              mapRef.current?.fitBounds(
+                [
+                  [Math.min(origin.coords[0], dest.coords[0]) - 0.005, Math.min(origin.coords[1], dest.coords[1]) - 0.005],
+                  [Math.max(origin.coords[0], dest.coords[0]) + 0.005, Math.max(origin.coords[1], dest.coords[1]) + 0.005],
+                ],
+                { padding: 80, duration: 800 }
+              );
+            }}
+            routeDestination={routeDestination}
+            onCancelRoute={() => {
+              setRouteDestination(null);
+              clearRoute();
+            }}
           />
         </div>
       )}
@@ -341,8 +360,7 @@ export default function Home() {
           label={searchLocation.label}
           segments={segments}
           onRouteHere={() => {
-            setPoint('destination', searchLocation.coords);
-            beginPicking('origin');
+            setRouteDestination({ coords: searchLocation.coords, label: searchLocation.label });
             setSearchLocation(null);
           }}
           onClose={() => setSearchLocation(null)}

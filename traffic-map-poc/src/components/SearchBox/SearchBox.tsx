@@ -1,22 +1,54 @@
 'use client';
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { LonLat, SearchOption } from './types';
 import { useSearch } from './useSearch';
 import { humanDist, getDistrict } from './photon';
 
-interface SearchBoxProps {
-  mapCenter: LonLat;
-  onSelect: (coords: LonLat, label: string) => void;
+type Mode = 'search' | 'route';
+
+interface RoutePoint {
+  coords: LonLat;
+  label: string;
 }
 
-export const SearchBox: React.FC<SearchBoxProps> = ({ mapCenter, onSelect }) => {
-  const { input, setInput, options, loading } = useSearch(mapCenter);
-  const [focused, setFocused] = useState(false);
+interface SearchBoxProps {
+  mapCenter: LonLat;
+  /** Called when user selects a place to explore */
+  onSelect: (coords: LonLat, label: string) => void;
+  /** Called when both route points are set — triggers routing */
+  onRoute: (origin: RoutePoint, destination: RoutePoint) => void;
+  /** Enter route mode with destination pre-filled */
+  routeDestination?: RoutePoint | null;
+  /** Called when route mode is cancelled */
+  onCancelRoute?: () => void;
+}
+
+export const SearchBox: React.FC<SearchBoxProps> = ({
+  mapCenter, onSelect, onRoute, routeDestination, onCancelRoute,
+}) => {
+  const [mode, setMode] = useState<Mode>('search');
+  const [origin, setOrigin] = useState<RoutePoint | null>(null);
+  const [destination, setDestination] = useState<RoutePoint | null>(null);
+  const [activeField, setActiveField] = useState<'origin' | 'destination'>('origin');
+
+  const originSearch = useSearch(mapCenter);
+  const destSearch = useSearch(mapCenter);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const showDropdown = focused && input.trim().length > 0;
+  const [focused, setFocused] = useState(false);
+  const [focusField, setFocusField] = useState<'search' | 'origin' | 'destination'>('search');
 
+  // When routeDestination is passed from outside, enter route mode
+  useEffect(() => {
+    if (routeDestination) {
+      setDestination(routeDestination);
+      setMode('route');
+      setActiveField('origin');
+    }
+  }, [routeDestination]);
+
+  // Close dropdown on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -27,39 +59,108 @@ export const SearchBox: React.FC<SearchBoxProps> = ({ mapCenter, onSelect }) => 
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const handleSelect = (opt: SearchOption) => {
+  const handleExploreSelect = useCallback((opt: SearchOption) => {
     let coords: LonLat | null = null;
     if (opt.type === 'geocoder' && opt.feature) coords = opt.feature.geometry.coordinates;
     if (opt.type === 'coords' && opt.coords) coords = opt.coords.center;
     if (!coords) return;
     onSelect(coords, opt.label);
-    setInput('');
+    originSearch.setInput('');
     setFocused(false);
-  };
+  }, [onSelect, originSearch]);
+
+  const handleOriginSelect = useCallback((opt: SearchOption) => {
+    let coords: LonLat | null = null;
+    if (opt.type === 'geocoder' && opt.feature) coords = opt.feature.geometry.coordinates;
+    if (opt.type === 'coords' && opt.coords) coords = opt.coords.center;
+    if (!coords) return;
+    const point = { coords, label: opt.label };
+    setOrigin(point);
+    originSearch.setInput('');
+    setFocused(false);
+    // If destination already set, trigger route but stay in route mode
+    if (destination) {
+      onRoute(point, destination);
+    } else {
+      setActiveField('destination');
+    }
+  }, [destination, onRoute, originSearch]);
+
+  const handleDestSelect = useCallback((opt: SearchOption) => {
+    let coords: LonLat | null = null;
+    if (opt.type === 'geocoder' && opt.feature) coords = opt.feature.geometry.coordinates;
+    if (opt.type === 'coords' && opt.coords) coords = opt.coords.center;
+    if (!coords) return;
+    const point = { coords, label: opt.label };
+    setDestination(point);
+    destSearch.setInput('');
+    setFocused(false);
+    // If origin already set, trigger route but stay in route mode
+    if (origin) {
+      onRoute(origin, point);
+    }
+  }, [origin, onRoute, destSearch]);
+
+  const exitRouteMode = useCallback(() => {
+    setMode('search');
+    setOrigin(null);
+    setDestination(null);
+    originSearch.setInput('');
+    destSearch.setInput('');
+    onCancelRoute?.();
+  }, [onCancelRoute, originSearch, destSearch]);
+
+  const activeSearch = mode === 'route'
+    ? (activeField === 'origin' ? originSearch : destSearch)
+    : originSearch;
+  const activeOptions = activeSearch.options;
+  const activeLoading = activeSearch.loading;
+
+  const showDropdown = focused && activeSearch.input.trim().length > 0;
+
+  const handleSelect = mode === 'route'
+    ? (activeField === 'origin' ? handleOriginSelect : handleDestSelect)
+    : handleExploreSelect;
 
   return (
     <div ref={containerRef} style={styles.wrapper}>
-      <div style={styles.bar}>
-        <span style={styles.icon}>{'\uD83D\uDD0D'}</span>
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onFocus={() => setFocused(true)}
-          placeholder="Tìm địa điểm, đường, khu vực..."
-          style={styles.input}
+      {mode === 'search' ? (
+        <ExploreBar
+          input={originSearch.input}
+          onInput={originSearch.setInput}
+          onFocus={() => { setFocused(true); setFocusField('search'); }}
+          onRouteClick={() => {
+            setMode('route');
+            setActiveField('origin');
+            setDestination(null);
+            setOrigin(null);
+            setFocused(true);
+            setFocusField('origin');
+          }}
         />
-        {input && (
-          <button onClick={() => setInput('')} style={styles.clearBtn}>{'\u00D7'}</button>
-        )}
-      </div>
+      ) : (
+        <RouteBar
+          origin={origin}
+          destination={destination}
+          originInput={originSearch.input}
+          destInput={destSearch.input}
+          onOriginInput={originSearch.setInput}
+          onDestInput={destSearch.setInput}
+          onOriginFocus={() => { setFocused(true); setFocusField('origin'); setActiveField('origin'); }}
+          onDestFocus={() => { setFocused(true); setFocusField('destination'); setActiveField('destination'); }}
+          onOriginClear={() => { setOrigin(null); setActiveField('origin'); setFocused(true); }}
+          onDestClear={() => { setDestination(null); setActiveField('destination'); setFocused(true); }}
+          onExit={exitRouteMode}
+          activeField={activeField}
+        />
+      )}
       {showDropdown && (
         <div style={styles.dropdown}>
           <ResultsList
-            options={options}
-            input={input}
+            options={activeOptions}
+            input={activeSearch.input}
             mapCenter={mapCenter}
-            loading={loading}
+            loading={activeLoading}
             onSelect={handleSelect}
           />
         </div>
@@ -68,15 +169,81 @@ export const SearchBox: React.FC<SearchBoxProps> = ({ mapCenter, onSelect }) => 
   );
 };
 
+/* ── Explore mode: single search bar ── */
+const ExploreBar = ({ input, onInput, onFocus, onRouteClick }: {
+  input: string; onInput: (v: string) => void; onFocus: () => void; onRouteClick: () => void;
+}) => (
+  <div style={styles.bar}>
+    <span style={styles.icon}>{'\uD83D\uDD0D'}</span>
+    <input type="text" value={input} onChange={(e) => onInput(e.target.value)} onFocus={onFocus}
+      placeholder="Tìm địa điểm, đường, khu vực..." style={styles.input} />
+    {input && <button onClick={() => onInput('')} style={styles.clearBtn}>{'\u00D7'}</button>}
+    <button onClick={onRouteClick} style={styles.routeBtn} title="Chỉ đường">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+    </button>
+  </div>
+);
+
+/* ── Route mode: origin + destination fields ── */
+const RouteBar = ({ origin, destination, originInput, destInput, onOriginInput, onDestInput,
+  onOriginFocus, onDestFocus, onOriginClear, onDestClear, onExit, activeField }: {
+  origin: RoutePoint | null; destination: RoutePoint | null;
+  originInput: string; destInput: string;
+  onOriginInput: (v: string) => void; onDestInput: (v: string) => void;
+  onOriginFocus: () => void; onDestFocus: () => void;
+  onOriginClear: () => void; onDestClear: () => void;
+  onExit: () => void; activeField: string;
+}) => (
+  <div style={styles.routeBar}>
+    <div style={styles.routeHeader}>
+      <button onClick={onExit} style={styles.backBtn}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      </button>
+      <span style={styles.routeTitle}>Chỉ đường</span>
+    </div>
+    <div style={styles.routeFields}>
+      <RouteField
+        color="#16a34a" label="Điểm đi" value={origin}
+        input={activeField === 'origin' ? originInput : ''}
+        onInput={onOriginInput} onFocus={onOriginFocus} onClear={onOriginClear}
+        isActive={activeField === 'origin'} placeholder="Nhập điểm đi..."
+      />
+      <RouteField
+        color="#dc2626" label="Điểm đến" value={destination}
+        input={activeField === 'destination' ? destInput : ''}
+        onInput={onDestInput} onFocus={onDestFocus} onClear={onDestClear}
+        isActive={activeField === 'destination'} placeholder="Nhập điểm đến..."
+      />
+    </div>
+  </div>
+);
+
+const RouteField = ({ color, label, value, input, onInput, onFocus, onClear, isActive, placeholder }: {
+  color: string; label: string; value: RoutePoint | null; input: string;
+  onInput: (v: string) => void; onFocus: () => void; onClear: () => void; isActive: boolean; placeholder: string;
+}) => (
+  <div style={styles.routeField} onClick={onFocus}>
+    <div style={{ ...styles.dot, background: color }} />
+    {value ? (
+      <div style={styles.fieldValue}>
+        <span style={styles.fieldLabel}>{value.label}</span>
+        <button onClick={(e) => { e.stopPropagation(); onClear(); }} style={styles.fieldClearBtn}>&times;</button>
+      </div>
+    ) : isActive ? (
+      <input type="text" value={input} onChange={(e) => onInput(e.target.value)} onFocus={onFocus}
+        placeholder={placeholder} style={styles.fieldInput} autoFocus />
+    ) : (
+      <span style={styles.fieldPlaceholder}>{placeholder}</span>
+    )}
+  </div>
+);
+
+/* ── Results list ── */
 const ResultsList = ({ options, input, mapCenter, loading, onSelect }: {
-  options: SearchOption[];
-  input: string;
-  mapCenter: LonLat;
-  loading: boolean;
+  options: SearchOption[]; input: string; mapCenter: LonLat; loading: boolean;
   onSelect: (opt: SearchOption) => void;
 }) => {
   const geocoders = options.filter((o) => o.type === 'geocoder');
-
   const grouped = new Map<string, SearchOption[]>();
   for (const opt of geocoders) {
     const d = opt.feature ? getDistrict(opt.feature.properties) : 'Khác';
@@ -141,9 +308,8 @@ const styles: Record<string, React.CSSProperties> = {
   wrapper: { position: 'relative', zIndex: 2100 },
   bar: {
     display: 'flex', alignItems: 'center', gap: 8,
-    background: 'white', borderRadius: 12,
-    boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-    padding: '0 14px', height: 48,
+    background: 'white', borderRadius: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+    padding: '0 8px 0 14px', height: 48,
   },
   icon: { fontSize: 18, flexShrink: 0 },
   input: {
@@ -151,15 +317,43 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'Inter, sans-serif', background: 'transparent', color: '#333',
   },
   clearBtn: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#999' },
+  routeBtn: {
+    background: '#1976d2', border: 'none', borderRadius: 10,
+    padding: '8px 10px', cursor: 'pointer', color: 'white',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+  routeBar: {
+    background: 'white', borderRadius: 12,
+    boxShadow: '0 4px 20px rgba(0,0,0,0.15)', padding: '10px 14px',
+  },
+  routeHeader: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 },
+  backBtn: {
+    background: 'none', border: 'none', cursor: 'pointer', color: '#666',
+    padding: '4px 6px', borderRadius: 8, display: 'flex', alignItems: 'center',
+  },
+  routeTitle: { fontSize: 15, fontWeight: 700, color: '#0f172a' },
+  routeFields: { display: 'flex', flexDirection: 'column', gap: 6 },
+  routeField: {
+    display: 'flex', alignItems: 'center', gap: 10,
+    background: '#f8fafc', borderRadius: 10, padding: '10px 12px',
+    border: '1px solid #e2e8f0', cursor: 'pointer',
+  },
+  dot: { width: 12, height: 12, borderRadius: '50%', flexShrink: 0 },
+  fieldValue: { flex: 1, display: 'flex', alignItems: 'center', gap: 6 },
+  fieldClearBtn: {
+    background: 'none', border: 'none', fontSize: 16, cursor: 'pointer',
+    color: '#94a3b8', padding: '0 2px', lineHeight: 1, flexShrink: 0,
+  },
+  fieldLabel: { fontSize: 13, fontWeight: 500, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  fieldInput: { flex: 1, border: 'none', outline: 'none', fontSize: 13, fontFamily: 'Inter, sans-serif', background: 'transparent', color: '#333' },
+  fieldPlaceholder: { fontSize: 13, color: '#94a3b8' },
   dropdown: {
-    position: 'absolute', top: 56, left: 0, right: 0,
+    position: 'absolute', top: '100%', left: 0, right: 0,
+    marginTop: 6,
     background: 'white', borderRadius: 12, boxShadow: '0 8px 30px rgba(0,0,0,0.15)',
     maxHeight: 'calc(100vh - 140px)', overflowY: 'auto', padding: '4px 0',
   },
-  row: {
-    display: 'flex', alignItems: 'center', gap: 10,
-    padding: '10px 16px', cursor: 'pointer', transition: 'background 0.15s',
-  },
+  row: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', cursor: 'pointer' },
   rowIcon: { fontSize: 16, flexShrink: 0 },
   rowLabel: { fontSize: 14, fontWeight: 500, color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   rowSub: { fontSize: 12, color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
