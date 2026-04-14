@@ -1,0 +1,304 @@
+• Dưới đây là bản document gọn nhưng đủ để chốt hướng.
+
+  Long Route Issue
+  Vấn đề
+  Với route dài, predictionAnalysis hiện tại có thể “không nhận dữ
+  liệu kẹt xe” hoặc trả kết quả quá nghèo.
+
+  Nguyên nhân hiện tại
+  Ở traffic-map-poc/src/lib/server/routePredictionAnalysis.ts:1,
+  logic đang có 3 giới hạn:
+
+  - chỉ lấy segment trong bbox nới nhỏ quanh route
+  - chỉ match segment nếu gần route dưới một ngưỡng cố định
+  - cắt số segment match xuống một số lượng nhỏ
+
+  Điều này ổn cho route ngắn, nhưng route dài sẽ bị:
+
+  - coverage không đều dọc tuyến
+  - bỏ sót nhiều đoạn
+  - dễ kết luận sai kiểu “low congestion” chỉ vì thiếu dữ liệu
+
+  Giải pháp đề xuất
+  Không coi đây là bug UI. Đây là giới hạn của heuristic Phase 2.
+
+  Nên sửa theo 3 lớp:
+
+  1. Coverage-aware analysis
+     Thêm vào predictionAnalysis:
+
+  coverage?: {
+    matchedSegmentCount: number;
+    sampledPointCount: number;
+    coverageRatio: number;
+    level: 'low' | 'partial' | 'good';
+  }
+
+  Nếu coverage.level === 'low', UI không nên nói “low congestion”.
+  Phải nói kiểu:
+
+  - Traffic prediction coverage is limited for this route.
+  - Prediction confidence is low for long-distance analysis.
+
+  2. Bỏ hard cap cố định, đổi sang cap theo độ dài route
+     Ví dụ:
+
+  - route < 3 km: tối đa 48 segment
+  - route 3–10 km: tối đa 120 segment
+  - route > 10 km: tối đa 240 segment
+
+  3. Đổi cách match từ midpoint-near-route sang route sampling
+     Thay vì chỉ lấy midpoint của segment gần polyline, làm như sau:
+  - sample nhiều điểm dọc route theo khoảng cách đều, ví dụ mỗi 100–
+    150m
+  - tại mỗi sample point, tìm các segment traffic gần nhất
+  - gộp, dedupe, rồi score
+
+  Cách này cho coverage dọc tuyến tốt hơn nhiều.
+
+  Roadmap sửa practical
+
+  - Phase 2B.1:
+    Thêm coverage vào predictionAnalysis
+    Sửa summary để phản ánh thiếu coverage
+  - Phase 2B.2:
+    Đổi cap segment theo độ dài route
+  - Phase 2B.3:
+    Chuyển sang sampling-based route coverage
+
+  Kết luận
+  Cho route dài, hướng đúng không phải “cố highlight thêm”, mà là:
+
+  - đo coverage
+  - nói thật khi coverage thấp
+  - và đổi thuật toán match để phân tích theo toàn tuyến
+
+  ———
+
+  Phase 3 Plan
+  Tôi đọc phần bạn gửi và không có phản đối lớn. Hướng đó đúng với
+  hệ hiện tại.
+
+  Mục tiêu
+  Trả lời:
+
+  - nên đi lúc nào
+
+  Cách làm
+  Giữ một route A→B, chấm ở:
+
+  - 0
+  - 15
+  - 30
+  - 60
+
+  Backend
+  Endpoint gợi ý:
+
+  - POST /api/route/recommend-departure
+
+  Request:
+
+  interface DepartureRecommendationRequest {
+    origin: [number, number];
+    destination: [number, number];
+    profile?: 'car' | 'bike' | 'walk';
+    candidateOffsets?: (0 | 15 | 30 | 60)[];
+    includeSteps?: boolean;
+    includePredictionAnalysis?: boolean;
+  }
+
+  Response:
+
+  interface DepartureOption {
+    departureOffsetMinutes: 0 | 15 | 30 | 60;
+    predictedDurationSeconds: number;
+    delaySeconds: number;
+    congestionScore: number;
+    riskLevel: 'low' | 'medium' | 'high';
+    recommended: boolean;
+    tradeOff: string;
+    coverageLevel?: 'low' | 'partial' | 'good';
+  }
+
+  interface DepartureRecommendationResponse {
+    status: 'success' | 'error';
+    data?: {
+      route: RouteData;
+      options: DepartureOption[];
+      recommendedDepartureOffsetMinutes: 0 | 15 | 30 | 60;
+      summary: string;
+    };
+    error?: {
+      code: string;
+      message: string;
+    };
+  }
+
+  Rule chấm điểm
+  Rule-based là đủ:
+
+  score =
+    predictedDurationSeconds * 0.6 +
+    congestionScore * 100 * 0.25 +
+    riskPenalty * 0.15
+
+  UI
+  Trong panel hiện tại, thêm:
+
+  - Best time to leave
+  - danh sách 4 mốc
+  - một dòng giải thích ngắn
+
+  ———
+
+  Phase 4 Plan
+  Tôi cũng đồng ý với hướng này.
+
+  Mục tiêu
+  Trả lời:
+
+  - nên đi tuyến nào
+
+  Cách làm
+  Lấy 2–3 route alternatives, chấm từng route ở một thời điểm hoặc
+  nhiều thời điểm.
+
+  Backend
+  Endpoint gợi ý:
+
+  - POST /api/route/alternatives
+
+  Request:
+
+  interface AlternativeRoutesRequest {
+    origin: [number, number];
+    destination: [number, number];
+    profile?: 'car' | 'bike' | 'walk';
+    departureOffsetMinutes?: 0 | 15 | 30 | 60;
+    maxAlternatives?: number;
+    includeSteps?: boolean;
+    includePredictionAnalysis?: boolean;
+  }
+
+  Response:
+
+  interface RankedRouteOption {
+    routeId: string;
+    route: RouteData;
+    predictedDurationSeconds: number;
+    delaySeconds: number;
+    congestionScore: number;
+    riskLevel: 'low' | 'medium' | 'high';
+    tradeOff: string;
+    recommended: boolean;
+    coverageLevel?: 'low' | 'partial' | 'good';
+  }
+
+  interface AlternativeRoutesResponse {
+    status: 'success' | 'error';
+    data?: {
+      departureOffsetMinutes: 0 | 15 | 30 | 60;
+      options: RankedRouteOption[];
+      recommendedRouteId: string;
+      summary: string;
+    };
+    error?: {
+      code: string;
+      message: string;
+    };
+  }
+
+  UI
+
+  - Recommended Route
+  - Alternatives
+  - mỗi route có ETA, risk, trade-off
+
+  ———
+
+  OpenRouter Integration
+  Tôi cũng không có phản đối ở đây.
+
+  Vai trò đúng
+  OpenRouter chỉ nên là:
+
+  - explanation layer
+  - trade-off summarizer
+  - trip assistant
+
+  Không nên là:
+
+  - routing engine
+  - prediction model
+  - scoring core
+
+  Kiến trúc
+
+  Routing provider layer
+  -> Prediction scoring layer
+  -> Recommendation layer
+  -> OpenRouter explanation layer
+
+  Feature nên làm
+
+  1. Explain recommendation
+  2. Trade-off summary
+  3. Trip assistant
+
+  Endpoint gợi ý
+
+  - POST /api/recommendation/explain
+
+  Request:
+
+  interface ExplainRecommendationRequest {
+    context: {
+      recommendedRouteId?: string;
+      recommendedDepartureOffsetMinutes?: 0 | 15 | 30 | 60;
+      routeOptions?: RankedRouteOption[];
+      departureOptions?: DepartureOption[];
+    };
+  }
+
+  Response:
+
+  interface ExplainRecommendationResponse {
+    status: 'success' | 'error';
+    data?: {
+      shortExplanation: string;
+      tradeOffSummary: string;
+      assistantBullets: string[];
+    };
+    error?: {
+      code: string;
+      message: string;
+    };
+  }
+
+  Thời điểm tích hợp
+
+  - không đưa vào core của Phase 3
+  - chỉ thêm sau khi recommendation engine của Phase 3 chạy ổn
+  - hợp lý nhất là cuối Phase 3 hoặc đầu Phase 4
+
+  ———
+
+  Chốt
+  Tôi đồng ý với toàn bộ hướng bạn gửi.
+
+  Nếu cần chốt thành roadmap cuối:
+
+  1. sửa long-route coverage trong Phase 2
+  2. làm Phase 3: nên đi lúc nào
+  3. làm Phase 4: nên đi tuyến nào
+  4. thêm OpenRouter để giải thích, không đụng core scoring
+
+  Nếu bạn muốn, bước tiếp theo tôi có thể viết tiếp:
+
+  - một file spec markdown hoàn chỉnh cho Phase 3 + Phase 4 +
+    OpenRouter
+  - hoặc implement luôn phần coverage cho long-route issue trước.
+
+
+› Implement {feature}

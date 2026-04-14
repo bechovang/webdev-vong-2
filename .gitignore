@@ -87,5 +87,5 @@ WDA2026_THÔNG TIN VÒNG 2/
 .claude/
 .agents/
 _bmad/
-_bmad-output/
+# _bmad-output/
 .cursor/
