@@ -3,6 +3,8 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
   Coordinate,
+  DepartureRecommendation,
+  DepartureRecommendationResponse,
   DepartureOffsetMinutes,
   PickingMode,
   PredictionAnalysis,
@@ -15,8 +17,10 @@ interface UseRouteStateResult {
   destination: Coordinate | null;
   route: RouteData | null;
   predictionAnalysis: PredictionAnalysis | null;
+  departureRecommendation: DepartureRecommendation | null;
   pickingMode: PickingMode;
   routeLoading: boolean;
+  recommendationLoading: boolean;
   routeError: string | null;
   canRequestRoute: boolean;
   beginPicking: (mode: Exclude<PickingMode, null>) => void;
@@ -31,8 +35,10 @@ export function useRouteState(): UseRouteStateResult {
   const [destination, setDestination] = useState<Coordinate | null>(null);
   const [route, setRoute] = useState<RouteData | null>(null);
   const [predictionAnalysis, setPredictionAnalysis] = useState<PredictionAnalysis | null>(null);
+  const [departureRecommendation, setDepartureRecommendation] = useState<DepartureRecommendation | null>(null);
   const [pickingMode, setPickingMode] = useState<PickingMode>(null);
   const [routeLoading, setRouteLoading] = useState(false);
+  const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
 
   const beginPicking = useCallback((mode: Exclude<PickingMode, null>) => {
@@ -54,6 +60,7 @@ export function useRouteState(): UseRouteStateResult {
     setPickingMode(null);
     setRoute(null);
     setPredictionAnalysis(null);
+    setDepartureRecommendation(null);
     setRouteError(null);
   }, []);
 
@@ -62,10 +69,49 @@ export function useRouteState(): UseRouteStateResult {
     setDestination(null);
     setRoute(null);
     setPredictionAnalysis(null);
+    setDepartureRecommendation(null);
     setPickingMode(null);
     setRouteLoading(false);
+    setRecommendationLoading(false);
     setRouteError(null);
   }, []);
+
+  const requestDepartureRecommendation = useCallback(async () => {
+    if (!origin || !destination) {
+      return;
+    }
+
+    setDepartureRecommendation(null);
+    setRecommendationLoading(true);
+
+    try {
+      const response = await fetch('/api/route/recommend-departure', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          origin,
+          destination,
+          profile: 'car',
+          candidateOffsets: [0, 15, 30, 60],
+          includeSteps: true,
+        }),
+      });
+
+      const data = (await response.json()) as DepartureRecommendationResponse;
+      if (!response.ok || data.status !== 'success') {
+        throw new Error(('error' in data ? data.error?.message : null) || 'Failed to build departure recommendation');
+      }
+
+      setDepartureRecommendation(data.data);
+    } catch (error) {
+      console.error('Failed to build departure recommendation:', error);
+      setDepartureRecommendation(null);
+    } finally {
+      setRecommendationLoading(false);
+    }
+  }, [destination, origin]);
 
   const requestRoute = useCallback(async (params: { departureOffsetMinutes: DepartureOffsetMinutes; targetHour?: number; targetWeekday?: number }) => {
     if (!origin || !destination) {
@@ -74,6 +120,8 @@ export function useRouteState(): UseRouteStateResult {
     }
 
     setRouteLoading(true);
+    setDepartureRecommendation(null);
+    setRecommendationLoading(false);
     setRouteError(null);
 
     try {
@@ -101,14 +149,16 @@ export function useRouteState(): UseRouteStateResult {
 
       setRoute(data.data.route);
       setPredictionAnalysis(data.data.predictionAnalysis || null);
+      void requestDepartureRecommendation();
     } catch (error) {
       setRoute(null);
       setPredictionAnalysis(null);
+      setDepartureRecommendation(null);
       setRouteError(error instanceof Error ? error.message : 'Failed to build route');
     } finally {
       setRouteLoading(false);
     }
-  }, [destination, origin]);
+  }, [destination, origin, requestDepartureRecommendation]);
 
   const canRequestRoute = useMemo(() => {
     return Boolean(origin && destination && !routeLoading);
@@ -119,8 +169,10 @@ export function useRouteState(): UseRouteStateResult {
     destination,
     route,
     predictionAnalysis,
+    departureRecommendation,
     pickingMode,
     routeLoading,
+    recommendationLoading,
     routeError,
     canRequestRoute,
     beginPicking,

@@ -38,6 +38,24 @@ export interface PredictionAnalysis {
   coverage?: PredictionCoverage;
 }
 
+export interface DepartureRecommendationOption {
+  departureOffsetMinutes: DepartureOffsetMinutes;
+  predictedDurationSeconds: number;
+  delaySeconds: number;
+  congestionScore: number;
+  riskLevel: 'low' | 'medium' | 'high';
+  recommended: boolean;
+  tradeOff: string;
+  coverageLevel?: 'low' | 'partial' | 'good';
+}
+
+export interface DepartureRecommendation {
+  route: RouteData;
+  options: DepartureRecommendationOption[];
+  recommendedDepartureOffsetMinutes: DepartureOffsetMinutes;
+  summary: string;
+}
+
 export interface RouteData {
   provider: RouteProvider;
   profile: RouteProfile;
@@ -78,5 +96,28 @@ export interface RouteResponseError {
 }
 
 export type RouteResponse = RouteResponseSuccess | RouteResponseError;
+
+export interface DepartureRecommendationRequest {
+  origin: Coordinate;
+  destination: Coordinate;
+  profile?: RouteProfile;
+  candidateOffsets?: DepartureOffsetMinutes[];
+  includeSteps?: boolean;
+  includePredictionAnalysis?: boolean;
+}
+
+export interface DepartureRecommendationResponseSuccess {
+  status: 'success';
+  data: DepartureRecommendation;
+}
+
+export interface DepartureRecommendationResponseError {
+  status: 'error';
+  error: ApiError;
+}
+
+export type DepartureRecommendationResponse =
+  | DepartureRecommendationResponseSuccess
+  | DepartureRecommendationResponseError;
 
 export type PickingMode = 'origin' | 'destination' | null;

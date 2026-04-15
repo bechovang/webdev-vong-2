@@ -35,7 +35,9 @@ export default function Home() {
     destination,
     route,
     predictionAnalysis,
+    departureRecommendation,
     routeLoading,
+    recommendationLoading,
     routeError,
     setPoint,
     requestRoute,
@@ -386,6 +388,8 @@ export default function Home() {
         <RouteSummaryPanel
           route={route}
           predictionAnalysis={predictionAnalysis}
+          departureRecommendation={departureRecommendation}
+          recommendationLoading={recommendationLoading}
           routeError={routeError}
           pickingMode={null}
         />
