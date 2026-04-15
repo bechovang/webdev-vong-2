@@ -66,19 +66,7 @@ function parseCSVLine(line: string): string[] {
   return result;
 }
 
-/**
- * Read CSV file - uses fs.readFile locally, fetch on Vercel
- */
 async function readCSV(filename: string): Promise<string> {
-  if (process.env.VERCEL) {
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : `http://localhost:${process.env.PORT || 3000}`;
-    const response = await fetch(`${baseUrl}/data/${filename}`);
-    if (!response.ok) throw new Error(`Failed to fetch ${filename}: ${response.status}`);
-    return response.text();
-  }
-
   const csvPath = join(process.cwd(), 'public', 'data', filename);
   return readFile(csvPath, 'utf-8');
 }
