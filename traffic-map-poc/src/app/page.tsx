@@ -3,7 +3,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import MapView from '@/components/Map';
-import RouteControls from '@/components/RouteControls';
 import RouteLayer from '@/components/RouteLayer';
 import RouteSummaryPanel from '@/components/RouteSummaryPanel';
 import { SearchBox, SearchLocationMarker } from '@/components/SearchBox';
@@ -19,6 +18,7 @@ export default function Home() {
   const [mapCenter, setMapCenter] = useState<[number, number]>([106.6922, 10.7769]);
   const [searchLocation, setSearchLocation] = useState<{ coords: LonLat; label: string } | null>(null);
   const [routeDestination, setRouteDestination] = useState<RoutePoint | null>(null);
+  const [pendingRouteRequest, setPendingRouteRequest] = useState(false);
   const mapInitialized = useRef(false);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const viewportSetupRef = useRef(false);
@@ -35,12 +35,8 @@ export default function Home() {
     destination,
     route,
     predictionAnalysis,
-    pickingMode,
     routeLoading,
     routeError,
-    canRequestRoute,
-    beginPicking,
-    cancelPicking,
     setPoint,
     requestRoute,
     clearRoute,
@@ -48,7 +44,7 @@ export default function Home() {
 
   useMapPicking({
     map,
-    pickingMode,
+    pickingMode: null,
     onPick: setPoint,
   });
 
@@ -148,6 +144,23 @@ export default function Home() {
     return timeSelection.customTime?.getDay();
   }, [timeSelection]);
 
+  useEffect(() => {
+    if (!pendingRouteRequest || !origin || !destination) {
+      return;
+    }
+
+    setPendingRouteRequest(false);
+    void requestRoute({ departureOffsetMinutes, targetHour, targetWeekday });
+  }, [
+    pendingRouteRequest,
+    origin,
+    destination,
+    requestRoute,
+    departureOffsetMinutes,
+    targetHour,
+    targetWeekday,
+  ]);
+
   return (
     <main style={{ width: '100vw', height: '100vh', overflow: 'hidden' }}>
       <div
@@ -211,8 +224,8 @@ export default function Home() {
 
       {!error && (
         <div style={{
-          position: 'absolute', top: 70, left: 16, right: 16, zIndex: 2100,
-          maxWidth: 480,
+          position: 'absolute', top: 70, left: '50%', transform: 'translateX(-50%)', zIndex: 2100,
+          width: 'min(560px, calc(100vw - 32px))',
         }}>
           <SearchBox
             mapCenter={mapCenter}
@@ -224,7 +237,7 @@ export default function Home() {
               setPoint('origin', origin.coords);
               setPoint('destination', dest.coords);
               setRouteDestination(null);
-              requestRoute({ departureOffsetMinutes, targetHour, targetWeekday });
+              setPendingRouteRequest(true);
               mapRef.current?.fitBounds(
                 [
                   [Math.min(origin.coords[0], dest.coords[0]) - 0.005, Math.min(origin.coords[1], dest.coords[1]) - 0.005],
@@ -235,9 +248,16 @@ export default function Home() {
             }}
             routeDestination={routeDestination}
             onCancelRoute={() => {
+              setPendingRouteRequest(false);
               setRouteDestination(null);
               clearRoute();
             }}
+            onClearRoute={() => {
+              setPendingRouteRequest(false);
+              setRouteDestination(null);
+              clearRoute();
+            }}
+            routeLoading={routeLoading}
           />
         </div>
       )}
@@ -360,21 +380,6 @@ export default function Home() {
         />
       )}
 
-      {!error && (
-        <RouteControls
-          origin={origin}
-          destination={destination}
-          hasRoute={Boolean(route)}
-          pickingMode={pickingMode}
-          routeLoading={routeLoading}
-          canRequestRoute={canRequestRoute}
-          onBeginPicking={beginPicking}
-          onCancelPicking={cancelPicking}
-          onRequestRoute={() => requestRoute({ departureOffsetMinutes, targetHour, targetWeekday })}
-          onClearRoute={clearRoute}
-        />
-      )}
-
       {!error && <TimePicker value={timeSelection} onChange={setTimeSelection} />}
 
       {!error && (
@@ -382,7 +387,7 @@ export default function Home() {
           route={route}
           predictionAnalysis={predictionAnalysis}
           routeError={routeError}
-          pickingMode={pickingMode}
+          pickingMode={null}
         />
       )}
     </main>
