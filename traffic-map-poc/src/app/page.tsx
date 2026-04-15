@@ -28,9 +28,7 @@ export default function Home() {
     loading,
     loadByBounds,
     loadedCount,
-    currentZoom,
     updateZoom,
-    canHoverDetails,
   } = useTrafficSegments(map, timeSelection, { minZoomForDetails: 14 });
   const {
     origin,
@@ -119,7 +117,6 @@ export default function Home() {
   }, [map, loadByBounds, updateZoom]);
 
   const isPrediction = timeSelection.type !== 'preset' || timeSelection.horizon !== 'now';
-  const canLoadDetails = currentZoom >= 14;
   const departureOffsetMinutes =
     timeSelection.type === 'preset'
       ? timeSelection.horizon === '+15'
@@ -209,20 +206,6 @@ export default function Home() {
           >
             {loadedCount.toLocaleString()} visible segments
           </div>
-          {canLoadDetails && (
-            <div
-              style={{
-                padding: '8px 16px',
-                background: 'rgba(34, 197, 94, 0.2)',
-                borderRadius: 20,
-                fontSize: 12,
-                fontWeight: 600,
-                backdropFilter: 'blur(10px)',
-              }}
-            >
-              Detail layer active
-            </div>
-          )}
         </div>
       </div>
 
@@ -401,41 +384,6 @@ export default function Home() {
           routeError={routeError}
           pickingMode={pickingMode}
         />
-      )}
-
-      {!error && segments.length > 0 && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: isPrediction ? 210 : 110,
-            left: 10,
-            background: 'rgba(255, 255, 255, 0.95)',
-            padding: '12px 16px',
-            borderRadius: 10,
-            fontSize: 13,
-            zIndex: 1000,
-            boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-            maxWidth: 320,
-            border: isPrediction ? '2px solid #7c4dff' : 'none',
-          }}
-        >
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>Behavior</div>
-          <div style={{ opacity: 0.8, lineHeight: 1.6, fontSize: 12 }}>
-            <div>• Fetch only the current viewport after pan or zoom settles.</div>
-            <div>• Zoom below 12 shows major roads only.</div>
-            <div>• Zoom 12-14 shows more segments.</div>
-            <div>• Hover details activate at zoom 15+.</div>
-            <div style={{ marginTop: 6, padding: '6px 10px', background: '#f0f9ff', borderRadius: 6, fontWeight: 500, fontSize: 11 }}>
-              Current zoom: {currentZoom.toFixed(1)}
-            </div>
-            <div style={{ marginTop: 4, padding: '6px 10px', background: canLoadDetails ? '#dcfce7' : '#f3f4f6', borderRadius: 6, fontWeight: 500, fontSize: 11 }}>
-              {canLoadDetails ? 'Full viewport detail active' : 'Zoom in for full viewport detail'}
-            </div>
-            <div style={{ marginTop: 4, padding: '6px 10px', background: canHoverDetails ? '#dcfce7' : '#fef3c7', borderRadius: 6, fontWeight: 500, fontSize: 11 }}>
-              {canHoverDetails ? 'Hover popup enabled' : 'Hover popup at zoom 15+'}
-            </div>
-          </div>
-        </div>
       )}
     </main>
   );
