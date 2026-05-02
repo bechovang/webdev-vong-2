@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import maplibregl, { GeoJSONSource, MapGeoJSONFeature } from 'maplibre-gl';
 import { TimeSelection } from '../TimePicker';
 import { useTrafficPredictionCache } from '@/lib/useTrafficPredictionCache';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 const SOURCE_ID = 'traffic-segments-source';
 const LAYER_ID = 'traffic-segments-layer';
@@ -18,12 +19,12 @@ const LOS_COLORS = {
 };
 
 const LOS_LABELS = {
-  A: 'Thong thoang',
-  B: 'Kha tot',
-  C: 'On dinh',
-  D: 'Bat dau ket',
-  E: 'Ket xe',
-  F: 'Ket cung',
+  A: 'Thông thoáng',
+  B: 'Khá tốt',
+  C: 'Ổn định',
+  D: 'Bắt đầu kẹt',
+  E: 'Kẹt xe',
+  F: 'Kẹt cứng',
 };
 
 export interface TrafficSegment {
@@ -67,6 +68,16 @@ export const TrafficOverlay: React.FC<TrafficOverlayProps> = ({
   const { getCachedPrediction } = useTrafficPredictionCache();
 
   const segmentsWithLOS = useMemo(() => {
+    // If segments already have LOS from XGBoost API, use them directly
+    const hasAPILos = segments.length > 0 && segments.some(s => s.los !== undefined);
+    if (hasAPILos) {
+      return segments.map(s => ({
+        ...s,
+        los: s.los || 'C',
+        confidence: s.confidence || 0.5,
+      }));
+    }
+    // Fallback to heuristic
     return getCachedPrediction(segments, timeSelection, simulateLOSBatch);
   }, [segments, timeSelection, getCachedPrediction]);
 
@@ -224,10 +235,22 @@ export const TrafficOverlay: React.FC<TrafficOverlayProps> = ({
     };
   }, [map]);
 
+  const isMobile = useIsMobile();
+
   return (
     <>
-      <LOSLegend isPrediction={isPrediction} />
-      <StatsPanel stats={stats} timeSelection={timeSelection} />
+      {isMobile ? (
+        <MobileTrafficOverlay
+          isPrediction={isPrediction}
+          stats={stats}
+          timeSelection={timeSelection}
+        />
+      ) : (
+        <>
+          <LOSLegend isPrediction={isPrediction} />
+          <StatsPanel stats={stats} timeSelection={timeSelection} />
+        </>
+      )}
     </>
   );
 };
@@ -270,10 +293,10 @@ function buildPopupHtml(props: SegmentFeatureProperties) {
         <div style="font-size: 14px; font-weight: 600;">${props.label}</div>
       </div>
       <div style="font-size: 12px; color: #4b5563; line-height: 1.6;">
-        <div>Confidence: ${(props.confidence * 100).toFixed(0)}%</div>
-        <div>Street level: ${props.street_level}</div>
-        <div>Max velocity: ${props.max_velocity} km/h</div>
-        <div>Length: ${Math.round(props.length)} m</div>
+        <div>Độ tin cậy: ${(props.confidence * 100).toFixed(0)}%</div>
+        <div>Cấp đường: ${props.street_level}</div>
+        <div>Vận tốc tối đa: ${props.max_velocity} km/h</div>
+        <div>Chiều dài: ${Math.round(props.length)} m</div>
       </div>
     </div>
   `;
@@ -284,18 +307,25 @@ function simulateLOSBatch(
   timeSelection: TimeSelection
 ): TrafficSegment[] {
   let targetTime: Date;
+  let targetWeekday: number;
 
   if (timeSelection.type === 'preset') {
     const now = new Date();
     const horizon = timeSelection.horizon || 'now';
     const offsetMinutes = horizon === 'now' ? 0 : parseInt(horizon.slice(1), 10);
     targetTime = new Date(now.getTime() + offsetMinutes * 60 * 1000);
+    targetWeekday = timeSelection.weekday !== undefined
+      ? timeSelection.weekday
+      : targetTime.getDay();
   } else {
     targetTime = timeSelection.customTime || new Date();
+    targetWeekday = timeSelection.weekday !== undefined
+      ? timeSelection.weekday
+      : targetTime.getDay();
   }
 
   const hour = targetTime.getHours();
-  const weekday = targetTime.getDay();
+  const weekday = targetWeekday;
   const isWeekend = weekday === 0 || weekday === 6;
   const isRushHour = (hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19);
   const isNight = hour >= 22 || hour <= 6;
@@ -378,7 +408,7 @@ const LOSLegend: React.FC<{ isPrediction?: boolean }> = ({ isPrediction = false 
       }}
     >
       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
-        {isPrediction ? 'Prediction LOS' : 'Current LOS'}
+        {isPrediction ? 'LOS Dự báo' : 'LOS Hiện tại'}
       </div>
 
       {Object.entries(LOS_COLORS).map(([los, color]) => (
@@ -416,8 +446,8 @@ const StatsPanel: React.FC<{
   const getTimeLabel = () => {
     if (timeSelection.type === 'preset') {
       const horizon = timeSelection.horizon || 'now';
-      if (horizon === 'now') return 'Hien tai';
-      return `+${horizon.slice(1)} phut`;
+      if (horizon === 'now') return 'Hiện tại';
+      return `+${horizon.slice(1)} phút`;
     }
 
     return timeSelection.customTime?.toLocaleTimeString('vi-VN', {
@@ -441,22 +471,22 @@ const StatsPanel: React.FC<{
         minWidth: 240,
       }}
     >
-      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 14 }}>Traffic Stats</div>
+      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 14 }}>Thống kê giao thông</div>
 
       <div style={{ padding: '12px', background: '#f8f9fa', borderRadius: 10, marginBottom: 14 }}>
-        <div style={{ fontSize: 12, color: '#666', marginBottom: 6, fontWeight: 500 }}>Time</div>
+        <div style={{ fontSize: 12, color: '#666', marginBottom: 6, fontWeight: 500 }}>Thời gian</div>
         <div style={{ fontSize: 18, fontWeight: 700, color: '#1f2937' }}>{getTimeLabel()}</div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
         <div>
-          <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Visible segments</div>
+          <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Đoạn đường hiển thị</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: '#1976d2' }}>
             {stats.total.toLocaleString()}
           </div>
         </div>
         <div>
-          <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Congested</div>
+          <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Đang kẹt</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: '#ef4444' }}>
             {stats.congested.toLocaleString()}
           </div>
@@ -464,7 +494,7 @@ const StatsPanel: React.FC<{
       </div>
 
       <div style={{ fontSize: 12, color: '#666', marginBottom: 10 }}>
-        Congested ratio: <strong>{stats.congestedPercent}%</strong>
+        Tỷ lệ kẹt xe: <strong>{stats.congestedPercent}%</strong>
       </div>
 
       {['A', 'B', 'C', 'D', 'E', 'F'].map((los) => {
@@ -497,3 +527,123 @@ const StatsPanel: React.FC<{
 };
 
 export default TrafficOverlay;
+
+const MobileTrafficOverlay: React.FC<{
+  isPrediction: boolean;
+  stats: ReturnType<typeof calculateStats>;
+  timeSelection: TimeSelection;
+}> = ({ isPrediction, stats, timeSelection }) => {
+  const [open, setOpen] = useState(false);
+
+  const getTimeLabel = () => {
+    if (timeSelection.type === 'preset') {
+      const horizon = timeSelection.horizon || 'now';
+      if (horizon === 'now') return 'Hiện tại';
+      return `+${horizon.slice(1)} phút`;
+    }
+    return timeSelection.customTime?.toLocaleTimeString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }) || '';
+  };
+
+  return (
+    <>
+      {/* Toggle button */}
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        style={{
+          position: 'absolute',
+          top: 70,
+          left: 10,
+          zIndex: 1100,
+          width: 40,
+          height: 40,
+          borderRadius: 12,
+          border: 'none',
+          background: open ? '#1976d2' : 'white',
+          color: open ? 'white' : '#1976d2',
+          fontSize: 18,
+          cursor: 'pointer',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        &#9776;
+      </button>
+
+      {/* Expanded panel */}
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 118,
+            left: 10,
+            right: 10,
+            zIndex: 1100,
+            background: 'white',
+            padding: 14,
+            borderRadius: 14,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
+            maxHeight: 'calc(100vh - 140px)',
+            overflowY: 'auto',
+          }}
+        >
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>
+            {isPrediction ? 'LOS Dự báo' : 'LOS Hiện tại'}
+          </div>
+
+          {/* Legend inline */}
+          {Object.entries(LOS_COLORS).map(([los, color]) => (
+            <div key={los} style={{ display: 'flex', alignItems: 'center', marginBottom: 6, gap: 8 }}>
+              <div style={{ width: 20, height: 6, background: color, borderRadius: 999 }} />
+              <span style={{ fontSize: 12 }}>
+                <strong style={{ color }}>{los}</strong> - {LOS_LABELS[los as keyof typeof LOS_LABELS]}
+              </span>
+            </div>
+          ))}
+
+          <div style={{ borderTop: '1px solid #e5e7eb', margin: '10px 0' }} />
+
+          {/* Stats */}
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Thống kê giao thông</div>
+          <div style={{ padding: '10px', background: '#f8f9fa', borderRadius: 10, marginBottom: 10 }}>
+            <div style={{ fontSize: 12, color: '#666', marginBottom: 4, fontWeight: 500 }}>Thời gian</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#1f2937' }}>{getTimeLabel()}</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div>
+              <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Đoạn đường hiển thị</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: '#1976d2' }}>{stats.total.toLocaleString()}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Đang kẹt</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: '#ef4444' }}>{stats.congested.toLocaleString()}</div>
+            </div>
+          </div>
+          <div style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
+            Tỷ lệ kẹt xe: <strong>{stats.congestedPercent}%</strong>
+          </div>
+
+          {['A', 'B', 'C', 'D', 'E', 'F'].map((los) => {
+            const count = stats.losCounts[los] || 0;
+            const percent = stats.total > 0 ? ((count / stats.total) * 100).toFixed(1) : '0';
+            return (
+              <div key={los} style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ width: 20, fontWeight: 700, color: LOS_COLORS[los as keyof typeof LOS_COLORS], fontSize: 12 }}>{los}</span>
+                <div style={{ flex: 1, margin: '0 8px', height: 6, background: '#f3f4f6', borderRadius: 4 }}>
+                  <div style={{ width: `${percent}%`, height: '100%', background: LOS_COLORS[los as keyof typeof LOS_COLORS], borderRadius: 4 }} />
+                </div>
+                <span style={{ fontSize: 11, color: '#6b7280', width: 40, textAlign: 'right' }}>{percent}%</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+};

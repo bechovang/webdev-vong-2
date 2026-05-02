@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import MapView from '@/components/Map';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import RouteLayer from '@/components/RouteLayer';
 import RouteSummaryPanel from '@/components/RouteSummaryPanel';
 import { SearchBox, SearchLocationMarker } from '@/components/SearchBox';
@@ -16,6 +17,7 @@ export default function Home() {
   const [error] = useState<string | null>(null);
   const [timeSelection, setTimeSelection] = useState<TimeSelection>({ type: 'preset', horizon: 'now' });
   const [mapCenter, setMapCenter] = useState<[number, number]>([106.6922, 10.7769]);
+  const isMobile = useIsMobile();
   const [searchLocation, setSearchLocation] = useState<{ coords: LonLat; label: string } | null>(null);
   const [routeDestination, setRouteDestination] = useState<RoutePoint | null>(null);
   const [pendingRouteRequest, setPendingRouteRequest] = useState(false);
@@ -137,6 +139,12 @@ export default function Home() {
   }, [timeSelection]);
 
   const targetWeekday = useMemo(() => {
+    // If weekday is explicitly selected in TimePicker, use that
+    if (timeSelection.weekday !== undefined) {
+      return timeSelection.weekday;
+    }
+
+    // Otherwise, calculate from timeSelection
     if (timeSelection.type === 'preset') {
       const now = new Date();
       const horizon = timeSelection.horizon || 'now';
@@ -188,9 +196,11 @@ export default function Home() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>SmartRoute</h1>
-            <p style={{ fontSize: 13, opacity: 0.9, margin: '2px 0 0 0' }}>
-              Viewport-based traffic prediction for HCMC
-            </p>
+            {!isMobile && (
+              <p style={{ fontSize: 13, opacity: 0.9, margin: '2px 0 0 0' }}>
+                Dự báo giao thông theo khung nhìn cho TP.HCM
+              </p>
+            )}
           </div>
           {isPrediction && (
             <div
@@ -203,7 +213,7 @@ export default function Home() {
                 backdropFilter: 'blur(10px)',
               }}
             >
-              Prediction mode
+              Chế độ dự báo
             </div>
           )}
         </div>
@@ -214,12 +224,12 @@ export default function Home() {
               padding: '8px 16px',
               background: 'rgba(255,255,255,0.15)',
               borderRadius: 20,
-              fontSize: 13,
+              fontSize: isMobile ? 11 : 13,
               fontWeight: 600,
               backdropFilter: 'blur(10px)',
             }}
           >
-            {loadedCount.toLocaleString()} visible segments
+            {loadedCount.toLocaleString()} đoạn đường
           </div>
         </div>
       </div>
@@ -291,7 +301,7 @@ export default function Home() {
               marginBottom: 16,
             }}
           />
-          <div style={{ fontSize: 16, fontWeight: 600 }}>Loading viewport data...</div>
+          <div style={{ fontSize: 16, fontWeight: 600 }}>Đang tải dữ liệu bản đồ...</div>
           <style>{`
             @keyframes spin {
               0% { transform: rotate(0deg); }
@@ -329,7 +339,7 @@ export default function Home() {
               animation: 'spin 1s linear infinite',
             }}
           />
-          Refreshing current viewport...
+          Đang làm mới dữ liệu...
         </div>
       )}
 
@@ -382,7 +392,7 @@ export default function Home() {
         />
       )}
 
-      {!error && <TimePicker value={timeSelection} onChange={setTimeSelection} />}
+      {!error && <TimePicker value={timeSelection} onChange={setTimeSelection} collapsed={!!route && isMobile} />}
 
       {!error && (
         <RouteSummaryPanel

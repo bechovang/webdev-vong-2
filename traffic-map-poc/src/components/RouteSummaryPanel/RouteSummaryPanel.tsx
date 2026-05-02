@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import {
   DepartureRecommendation,
   DepartureRecommendationOption,
@@ -29,20 +30,20 @@ function formatDistance(distanceMeters: number) {
 function formatDuration(durationSeconds: number) {
   const minutes = Math.max(1, Math.round(durationSeconds / 60));
   if (minutes < 60) {
-    return `${minutes} min`;
+    return `${minutes} phút`;
   }
 
   const hours = Math.floor(minutes / 60);
   const remainingMinutes = minutes % 60;
-  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+  return remainingMinutes > 0 ? `${hours} giờ ${remainingMinutes} phút` : `${hours} giờ`;
 }
 
 function formatDelay(delaySeconds: number | undefined) {
   if (!delaySeconds || delaySeconds <= 0) {
-    return '+0 min';
+    return '+0 phút';
   }
 
-  return `+${Math.max(1, Math.round(delaySeconds / 60))} min`;
+  return `+${Math.max(1, Math.round(delaySeconds / 60))} phút`;
 }
 
 function formatCongestionScore(score: number | undefined) {
@@ -50,12 +51,17 @@ function formatCongestionScore(score: number | undefined) {
 }
 
 function formatRiskLevel(riskLevel: PredictionAnalysis['riskLevel']) {
-  if (!riskLevel) return 'Unknown';
-  return riskLevel[0].toUpperCase() + riskLevel.slice(1);
+  if (!riskLevel) return 'Không xác định';
+  switch (riskLevel) {
+    case 'low': return 'Thấp';
+    case 'medium': return 'Trung bình';
+    case 'high': return 'Cao';
+    default: return riskLevel;
+  }
 }
 
 function formatDepartureOffset(offset: DepartureRecommendationOption['departureOffsetMinutes']) {
-  return offset === 0 ? 'Now' : `+${offset} min`;
+  return offset === 0 ? 'Bây giờ' : `+${offset} phút`;
 }
 
 function getRiskBackground(riskLevel: PredictionAnalysis['riskLevel']) {
@@ -114,7 +120,7 @@ function getCoverageIcon(coverageLevel: 'low' | 'partial' | 'good'): string {
       return '~';
     case 'good':
     default:
-      return 'OK';
+      return '✓';
   }
 }
 
@@ -126,29 +132,189 @@ export const RouteSummaryPanel: React.FC<RouteSummaryPanelProps> = ({
   routeError,
   pickingMode,
 }) => {
+  const isMobile = useIsMobile();
+  const [expanded, setExpanded] = useState(false);
+
+  const containerStyle: React.CSSProperties = {
+    position: 'absolute',
+    right: 10,
+    bottom: isMobile ? 50 : 100,
+    zIndex: 1200,
+    width: isMobile ? 'calc(100vw - 20px)' : 'min(320px, calc(100vw - 20px))',
+    maxHeight: isMobile ? (expanded ? 'calc(60vh - 50px)' : undefined) : 'calc(100vh - 120px)',
+    overflowY: isMobile ? (expanded ? 'auto' : undefined) : 'auto',
+    background: 'rgba(255, 255, 255, 0.96)',
+    borderRadius: 16,
+    boxShadow: '0 10px 30px rgba(15, 23, 42, 0.16)',
+    padding: 16,
+  };
+
+  // Mobile: hide panel when no route
+  if (isMobile && !route) {
+    return null;
+  }
+
+  // Mobile: compact view when route exists
+  if (isMobile && route) {
+    const recommended = departureRecommendation?.options.find(o => o.recommended);
+    const riskColor = predictionAnalysis ? getRiskTextColor(predictionAnalysis.riskLevel) : '#047857';
+    const riskBg = predictionAnalysis ? getRiskBackground(predictionAnalysis.riskLevel) : '#ecfdf5';
+
+    return (
+      <div style={containerStyle}>
+        {/* Header row */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>Tóm tắt tuyến đường</div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {expanded && (
+              <button
+                type="button"
+                onClick={() => setExpanded(false)}
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: 8,
+                  border: '1px solid #cbd5e1',
+                  background: 'white',
+                  fontSize: 16,
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  lineHeight: 1,
+                }}
+              >
+                &times;
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setExpanded(!expanded)}
+            style={{
+              padding: '4px 10px',
+              borderRadius: 8,
+              border: '1px solid #cbd5e1',
+              background: expanded ? '#f1f5f9' : 'white',
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#334155',
+              cursor: 'pointer',
+            }}
+          >
+            {expanded ? 'Thu gọn' : 'Xem chi tiết'}
+            </button>
+          </div>
+        </div>
+
+        {/* Metrics row */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+          <div style={{ ...metricCardStyle, padding: '8px 10px' }}>
+            <div style={{ ...metricLabelStyle, fontSize: 10 }}>Khoảng cách</div>
+            <div style={{ ...metricValueStyle, fontSize: 18 }}>{formatDistance(route.distanceMeters)}</div>
+          </div>
+          <div style={{ ...metricCardStyle, padding: '8px 10px' }}>
+            <div style={{ ...metricLabelStyle, fontSize: 10 }}>Thời gian dự kiến</div>
+            <div style={{ ...metricValueStyle, fontSize: 18 }}>{formatDuration(route.durationSeconds)}</div>
+          </div>
+        </div>
+
+        {/* Compact prediction summary */}
+        {predictionAnalysis && (
+          <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: riskBg, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: riskColor }}>Giao thông dự báo</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: riskColor }}>{formatRiskLevel(predictionAnalysis.riskLevel)}</span>
+          </div>
+        )}
+
+        {/* Compact recommendation */}
+        {recommended && (
+          <div style={{ marginTop: 6, fontSize: 12, color: '#7c3aed', fontWeight: 600 }}>
+            Khuyến nghị: xuất phát {formatDepartureOffset(recommended.departureOffsetMinutes)} — Dự kiến {formatDuration(recommended.predictedDurationSeconds)}
+          </div>
+        )}
+        {recommendationLoading && !departureRecommendation && (
+          <div style={{ marginTop: 6, fontSize: 12, color: '#64748b' }}>Đang đánh giá các lựa chọn xuất phát...</div>
+        )}
+
+        {/* Expanded details */}
+        {expanded && (
+          <>
+            {predictionAnalysis && (
+              <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 10, background: getRiskBackground(predictionAnalysis.riskLevel) }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#475569' }}>Độ trễ dự kiến</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>{formatDelay(predictionAnalysis.delaySeconds)}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#475569' }}>Điểm tắc nghẽn</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>{formatCongestionScore(predictionAnalysis.congestionScore)}</div>
+                  </div>
+                </div>
+                {predictionAnalysis.summary && (
+                  <div style={{ fontSize: 11, color: '#334155', lineHeight: 1.5, marginTop: 6 }}>{predictionAnalysis.summary}</div>
+                )}
+                {predictionAnalysis.coverage && predictionAnalysis.coverage.level !== 'good' && (
+                  <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 6, background: getCoverageBackground(predictionAnalysis.coverage.level), fontSize: 10, color: getCoverageTextColor(predictionAnalysis.coverage.level), fontWeight: 600 }}>
+                    {getCoverageIcon(predictionAnalysis.coverage.level)} Độ phủ: {predictionAnalysis.coverage.level === 'low' ? 'THẤP' : 'MỘT PHẦN'} ({predictionAnalysis.coverage.coverageRatio * 100}%)
+                  </div>
+                )}
+              </div>
+            )}
+
+            {departureRecommendation && (
+              <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 10, background: '#f5f3ff', border: '1px solid #ddd6fe' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase' }}>Các lựa chọn xuất phát</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+                  {departureRecommendation.options.map((option) => (
+                    <div key={option.departureOffsetMinutes} style={{ padding: '8px 10px', borderRadius: 8, border: option.recommended ? '1px solid #c4b5fd' : '1px solid #e2e8f0', background: option.recommended ? '#faf5ff' : '#fff' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>
+                          {formatDepartureOffset(option.departureOffsetMinutes)} {option.recommended && <span style={{ fontSize: 10, background: '#7c3aed', color: 'white', padding: '2px 6px', borderRadius: 8, marginLeft: 4 }}>Tốt nhất</span>}
+                        </span>
+                        <span style={{ fontSize: 11, color: '#64748b' }}>Dự kiến {formatDuration(option.predictedDurationSeconds)}</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                        <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: '#f8fafc', fontWeight: 600 }}>Trễ {formatDelay(option.delaySeconds)}</span>
+                        <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: '#f8fafc', fontWeight: 600 }}>Rủi ro {formatRiskLevel(option.riskLevel)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Steps */}
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 6 }}>Các bước chỉ đường</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 180, overflowY: 'auto' }}>
+                {(route.steps || []).map((step, index) => (
+                  <div key={`${step.instruction}-${index}`} style={{ display: 'flex', gap: 8, padding: '6px 8px', borderRadius: 8, background: '#f8fafc' }}>
+                    <div style={{ width: 20, height: 20, borderRadius: 999, background: '#dbeafe', color: '#1d4ed8', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{index + 1}</div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>{step.instruction}</div>
+                      <div style={{ fontSize: 11, color: '#64748b' }}>{formatDistance(step.distanceMeters)}</div>
+                    </div>
+                  </div>
+                ))}
+                {(!route.steps || route.steps.length === 0) && (
+                  <div style={{ fontSize: 12, color: '#64748b' }}>Không có hướng dẫn từng bước cho tuyến đường này.</div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // Desktop: full view (unchanged)
   return (
-    <div
-      style={{
-        position: 'absolute',
-        right: 10,
-        bottom: 100,
-        zIndex: 1200,
-        width: 'min(320px, calc(100vw - 20px))',
-        maxHeight: 'calc(100vh - 120px)',
-        overflowY: 'auto',
-        background: 'rgba(255, 255, 255, 0.96)',
-        borderRadius: 16,
-        boxShadow: '0 10px 30px rgba(15, 23, 42, 0.16)',
-        padding: 16,
-      }}
-    >
-      <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>Route Summary</div>
+    <div style={containerStyle}>
+      <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>Tóm tắt tuyến đường</div>
 
       {!route && !routeError && (
         <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6, marginTop: 10 }}>
           {pickingMode
-            ? `Click the map to set the ${pickingMode === 'origin' ? 'start' : 'end'} point.`
-            : 'Pick a start and end point, then request a real route.'}
+            ? `Nhấp vào bản đồ để chọn điểm ${pickingMode === 'origin' ? 'xuất phát' : 'đích đến'}.`
+            : 'Chọn điểm xuất phát và điểm đến, sau đó yêu cầu tìm đường.'}
         </div>
       )}
 
@@ -172,11 +338,11 @@ export const RouteSummaryPanel: React.FC<RouteSummaryPanelProps> = ({
         <>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 14 }}>
             <div style={metricCardStyle}>
-              <div style={metricLabelStyle}>Distance</div>
+              <div style={metricLabelStyle}>Khoảng cách</div>
               <div style={metricValueStyle}>{formatDistance(route.distanceMeters)}</div>
             </div>
             <div style={metricCardStyle}>
-              <div style={metricLabelStyle}>ETA</div>
+              <div style={metricLabelStyle}>Thời gian dự kiến</div>
               <div style={metricValueStyle}>{formatDuration(route.durationSeconds)}</div>
             </div>
           </div>
@@ -200,7 +366,7 @@ export const RouteSummaryPanel: React.FC<RouteSummaryPanelProps> = ({
                     letterSpacing: '0.04em',
                   }}
                 >
-                  Predicted traffic
+                  Giao thông dự báo
                 </div>
                 <div style={{ fontSize: 12, fontWeight: 700, color: getRiskTextColor(predictionAnalysis.riskLevel) }}>
                   {formatRiskLevel(predictionAnalysis.riskLevel)}
@@ -224,21 +390,20 @@ export const RouteSummaryPanel: React.FC<RouteSummaryPanelProps> = ({
                 >
                   <span>{getCoverageIcon(predictionAnalysis.coverage.level)}</span>
                   <span>
-                    Data coverage: {predictionAnalysis.coverage.level.toUpperCase()} (
-                    {predictionAnalysis.coverage.coverageRatio * 100}% of route sampled)
+                    Độ phủ dữ liệu: {predictionAnalysis.coverage.level === 'low' ? 'THẤP' : predictionAnalysis.coverage.level === 'partial' ? 'MỘT PHẦN' : 'TỐT'} ({predictionAnalysis.coverage.coverageRatio * 100}% tuyến đường được lấy mẫu)
                   </span>
                 </div>
               )}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
                 <div>
-                  <div style={{ fontSize: 12, color: '#475569' }}>Delay estimate</div>
+                  <div style={{ fontSize: 12, color: '#475569' }}>Độ trễ dự kiến</div>
                   <div style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', marginTop: 2 }}>
                     {formatDelay(predictionAnalysis.delaySeconds)}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 12, color: '#475569' }}>Congestion score</div>
+                  <div style={{ fontSize: 12, color: '#475569' }}>Điểm tắc nghẽn</div>
                   <div style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', marginTop: 2 }}>
                     {formatCongestionScore(predictionAnalysis.congestionScore)}
                   </div>
@@ -251,7 +416,7 @@ export const RouteSummaryPanel: React.FC<RouteSummaryPanelProps> = ({
               )}
               {!!predictionAnalysis.congestedSegments?.length && (
                 <div style={{ fontSize: 12, color: '#334155', lineHeight: 1.6, marginTop: 10, fontWeight: 600 }}>
-                  {predictionAnalysis.congestedSegments.length} congested route segments are highlighted on the map.
+                  {predictionAnalysis.congestedSegments.length} đoạn đường kẹt xe được đánh dấu trên bản đồ.
                 </div>
               )}
             </div>
@@ -260,17 +425,17 @@ export const RouteSummaryPanel: React.FC<RouteSummaryPanelProps> = ({
           {(recommendationLoading || departureRecommendation) && (
             <div style={recommendationCardStyle}>
               <div>
-                <div style={recommendationLabelStyle}>Best time to leave</div>
+                <div style={recommendationLabelStyle}>Thời gian xuất phát tốt nhất</div>
                 {departureRecommendation && (
                   <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', marginTop: 4 }}>
-                    Recommended: {formatDepartureOffset(departureRecommendation.recommendedDepartureOffsetMinutes)}
+                    Khuyến nghị: {formatDepartureOffset(departureRecommendation.recommendedDepartureOffsetMinutes)}
                   </div>
                 )}
               </div>
 
               {recommendationLoading && !departureRecommendation && (
                 <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.6, marginTop: 10 }}>
-                  Evaluating now, +15, +30, and +60 minute departure options...
+                  Đang đánh giá các lựa chọn xuất phát bây giờ, +15, +30 và +60 phút...
                 </div>
               )}
 
@@ -295,23 +460,23 @@ export const RouteSummaryPanel: React.FC<RouteSummaryPanelProps> = ({
                               {formatDepartureOffset(option.departureOffsetMinutes)}
                             </div>
                             <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
-                              ETA {formatDuration(option.predictedDurationSeconds)}
+                              Dự kiến {formatDuration(option.predictedDurationSeconds)}
                             </div>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                            <div style={inlineChipStyle}>{formatRiskLevel(option.riskLevel)} risk</div>
+                            <div style={inlineChipStyle}>Rủi ro {formatRiskLevel(option.riskLevel)}</div>
                             {option.coverageLevel && option.coverageLevel !== 'good' && (
                               <div style={{ ...inlineChipStyle, color: '#7c3aed', borderColor: '#ddd6fe', background: '#faf5ff' }}>
-                                {option.coverageLevel.toUpperCase()} coverage
+                                Độ phủ {option.coverageLevel === 'low' ? 'thấp' : option.coverageLevel === 'partial' ? 'một phần' : 'tốt'}
                               </div>
                             )}
-                            {option.recommended && <div style={recommendedBadgeStyle}>Best</div>}
+                            {option.recommended && <div style={recommendedBadgeStyle}>Tốt nhất</div>}
                           </div>
                         </div>
 
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-                          <div style={inlineMetricStyle}>Delay {formatDelay(option.delaySeconds)}</div>
-                          <div style={inlineMetricStyle}>Score {option.congestionScore.toFixed(2)}</div>
+                          <div style={inlineMetricStyle}>Trễ {formatDelay(option.delaySeconds)}</div>
+                          <div style={inlineMetricStyle}>Điểm {option.congestionScore.toFixed(2)}</div>
                         </div>
 
                         <div
@@ -334,7 +499,7 @@ export const RouteSummaryPanel: React.FC<RouteSummaryPanelProps> = ({
           )}
 
           <div style={{ marginTop: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 10 }}>Steps</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 10 }}>Các bước chỉ đường</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto' }}>
               {(route.steps || []).map((step, index) => (
                 <div key={`${step.instruction}-${index}`} style={stepRowStyle}>
@@ -349,7 +514,7 @@ export const RouteSummaryPanel: React.FC<RouteSummaryPanelProps> = ({
               ))}
               {(!route.steps || route.steps.length === 0) && (
                 <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6 }}>
-                  No step-by-step instructions returned for this route.
+                  Không có hướng dẫn từng bước cho tuyến đường này.
                 </div>
               )}
             </div>

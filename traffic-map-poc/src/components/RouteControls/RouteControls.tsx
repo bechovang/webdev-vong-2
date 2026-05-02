@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { Coordinate, PickingMode } from '@/lib/routing';
 
 interface RouteControlsProps {
@@ -18,7 +19,7 @@ interface RouteControlsProps {
 
 function formatCoordinate(label: string, coordinate: Coordinate | null) {
   if (!coordinate) {
-    return `${label}: not set`;
+    return `${label}: chưa chọn`;
   }
 
   return `${label}: ${coordinate[1].toFixed(5)}, ${coordinate[0].toFixed(5)}`;
@@ -36,6 +37,8 @@ export const RouteControls: React.FC<RouteControlsProps> = ({
   onRequestRoute,
   onClearRoute,
 }) => {
+  const isMobile = useIsMobile();
+
   return (
     <div
       style={{
@@ -44,7 +47,7 @@ export const RouteControls: React.FC<RouteControlsProps> = ({
         left: hasRoute ? 10 : '50%',
         transform: hasRoute ? 'none' : 'translateX(-50%)',
         zIndex: 1600,
-        width: 'min(560px, calc(100vw - 24px))',
+        width: isMobile ? 'calc(100vw - 16px)' : 'min(560px, calc(100vw - 24px))',
         background: 'rgba(255, 255, 255, 0.96)',
         borderRadius: 16,
         boxShadow: '0 10px 30px rgba(15, 23, 42, 0.18)',
@@ -53,9 +56,9 @@ export const RouteControls: React.FC<RouteControlsProps> = ({
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>Route Builder</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>Tạo tuyến đường</div>
           <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
-            Use explicit pick mode, then click the map to place start and end points for live routing.
+            Sử dụng chế độ chọn, sau đó nhấp vào bản đồ để đặt điểm xuất phát và điểm đến.
           </div>
         </div>
         {pickingMode && (
@@ -69,39 +72,39 @@ export const RouteControls: React.FC<RouteControlsProps> = ({
               fontWeight: 700,
             }}
           >
-            Picking {pickingMode === 'origin' ? 'start' : 'end'}
+            Đang chọn điểm {pickingMode === 'origin' ? 'xuất phát' : 'đích đến'}
           </div>
         )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 14 }}>
         <div style={pointCardStyle}>
-          <div style={pointLabelStyle}>Start</div>
-          <div style={pointValueStyle}>{formatCoordinate('Point', origin)}</div>
+          <div style={pointLabelStyle}>Xuất phát</div>
+          <div style={pointValueStyle}>{formatCoordinate('Điểm', origin)}</div>
         </div>
         <div style={pointCardStyle}>
-          <div style={pointLabelStyle}>End</div>
-          <div style={pointValueStyle}>{formatCoordinate('Point', destination)}</div>
+          <div style={pointLabelStyle}>Đích đến</div>
+          <div style={pointValueStyle}>{formatCoordinate('Điểm', destination)}</div>
         </div>
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
         <button type="button" style={getButtonStyle(pickingMode === 'origin')} onClick={() => onBeginPicking('origin')}>
-          Pick Start
+          Chọn điểm xuất phát
         </button>
         <button type="button" style={getButtonStyle(pickingMode === 'destination')} onClick={() => onBeginPicking('destination')}>
-          Pick End
+          Chọn điểm đến
         </button>
         {pickingMode && (
           <button type="button" style={secondaryButtonStyle} onClick={onCancelPicking}>
-            Cancel Pick
+            Hủy chọn
           </button>
         )}
         <button type="button" style={primaryButtonStyle(canRequestRoute)} onClick={onRequestRoute} disabled={!canRequestRoute}>
-          {routeLoading ? 'Building Route...' : 'Get Route'}
+          {routeLoading ? 'Đang tạo tuyến đường...' : 'Tìm đường'}
         </button>
         <button type="button" style={secondaryButtonStyle} onClick={onClearRoute}>
-          Clear Route
+          Xóa tuyến đường
         </button>
       </div>
     </div>
