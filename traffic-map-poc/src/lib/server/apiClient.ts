@@ -5,6 +5,16 @@ const API_BASE = process.env.TRAFFIC_API_URL || 'http://localhost:8000';
 export interface SegmentWithPrediction extends TrafficSegmentRecord {
   los?: string;
   confidence?: number;
+  prediction_source?: string;
+  realtime_info?: {
+    hotspot_id: string;
+    hotspot_name: string;
+    severity: number;
+    speed_ratio: number;
+    delay_ratio: number;
+    influence: number;
+    distance_meters: number;
+  };
 }
 
 export interface PredictionResult {

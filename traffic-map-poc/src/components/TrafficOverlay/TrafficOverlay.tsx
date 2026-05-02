@@ -39,6 +39,16 @@ export interface TrafficSegment {
   street_level?: number;
   max_velocity?: number;
   length?: number;
+  prediction_source?: string;
+  realtime_info?: {
+    hotspot_id: string;
+    hotspot_name: string;
+    severity: number;
+    speed_ratio: number;
+    delay_ratio: number;
+    influence: number;
+    distance_meters: number;
+  };
 }
 
 interface TrafficOverlayProps {
@@ -56,6 +66,10 @@ type SegmentFeatureProperties = {
   street_level: number;
   max_velocity: number;
   length: number;
+  prediction_source: string;
+  realtime_hotspot: string;
+  realtime_speed_ratio: number;
+  realtime_influence: number;
 };
 
 export const TrafficOverlay: React.FC<TrafficOverlayProps> = ({
@@ -271,6 +285,10 @@ function segmentsToGeoJSON(segments: TrafficSegment[]): GeoJSON.FeatureCollectio
           street_level: segment.street_level || 0,
           max_velocity: segment.max_velocity || 0,
           length: segment.length || 0,
+          prediction_source: segment.prediction_source || 'heuristic',
+          realtime_hotspot: segment.realtime_info?.hotspot_name || '',
+          realtime_speed_ratio: segment.realtime_info?.speed_ratio || 0,
+          realtime_influence: segment.realtime_info?.influence || 0,
         },
         geometry: {
           type: 'LineString',
@@ -285,6 +303,21 @@ function segmentsToGeoJSON(segments: TrafficSegment[]): GeoJSON.FeatureCollectio
 }
 
 function buildPopupHtml(props: SegmentFeatureProperties) {
+  const sourceLabel = props.prediction_source === 'xgboost_realtime'
+    ? 'XGBoost + Realtime'
+    : props.prediction_source === 'xgboost'
+      ? 'XGBoost'
+      : 'Heuristic';
+
+  const realtimeSection = props.realtime_hotspot
+    ? `<div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #e5e7eb;">
+        <div style="font-size: 11px; font-weight: 600; color: #7c3aed; margin-bottom: 3px;">Realtime Data</div>
+        <div style="font-size: 11px; color: #6b7280;">Hotspot: ${props.realtime_hotspot}</div>
+        <div style="font-size: 11px; color: #6b7280;">Tốc độ/Free flow: ${(props.realtime_speed_ratio * 100).toFixed(0)}%</div>
+        <div style="font-size: 11px; color: #6b7280;">Ảnh hưởng: ${(props.realtime_influence * 100).toFixed(0)}%</div>
+      </div>`
+    : '';
+
   return `
     <div style="font-family: system-ui, sans-serif; padding: 4px 2px; min-width: 220px;">
       <div style="font-size: 13px; font-weight: 600; color: #6b7280; margin-bottom: 4px;">${props.street_name}</div>
@@ -294,10 +327,12 @@ function buildPopupHtml(props: SegmentFeatureProperties) {
       </div>
       <div style="font-size: 12px; color: #4b5563; line-height: 1.6;">
         <div>Độ tin cậy: ${(props.confidence * 100).toFixed(0)}%</div>
+        <div>Nguồn: ${sourceLabel}</div>
         <div>Cấp đường: ${props.street_level}</div>
         <div>Vận tốc tối đa: ${props.max_velocity} km/h</div>
         <div>Chiều dài: ${Math.round(props.length)} m</div>
       </div>
+      ${realtimeSection}
     </div>
   `;
 }
@@ -382,12 +417,17 @@ function calculateStats(segments: TrafficSegment[]) {
   const total = segments.length;
   const congested = (losCounts.E || 0) + (losCounts.F || 0);
   const congestedPercent = total > 0 ? ((congested / total) * 100).toFixed(1) : '0';
+  const realtimeAdjusted = segments.filter(s => s.prediction_source === 'xgboost_realtime').length;
+  const realtimeSources = new Set(segments.filter(s => s.realtime_info).map(s => s.realtime_info!.hotspot_name));
 
   return {
     total,
     losCounts,
     congested,
     congestedPercent,
+    realtimeAdjusted,
+    realtimeHotspotCount: realtimeSources.size,
+    realtimeHotspots: Array.from(realtimeSources),
   };
 }
 
@@ -496,6 +536,21 @@ const StatsPanel: React.FC<{
       <div style={{ fontSize: 12, color: '#666', marginBottom: 10 }}>
         Tỷ lệ kẹt xe: <strong>{stats.congestedPercent}%</strong>
       </div>
+
+      {stats.realtimeAdjusted > 0 && (
+        <div style={{ padding: '8px 12px', background: '#f0e6ff', borderRadius: 8, marginBottom: 14, borderLeft: '3px solid #7c3aed' }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#7c3aed', marginBottom: 4 }}>Realtime Adjustment</div>
+          <div style={{ fontSize: 12, color: '#4b5563' }}>
+            Segments adjusted: <strong>{stats.realtimeAdjusted}</strong>
+          </div>
+          <div style={{ fontSize: 12, color: '#4b5563' }}>
+            Hotspots active: <strong>{stats.realtimeHotspotCount}</strong>
+            {stats.realtimeHotspots.length > 0 && (
+              <span style={{ fontSize: 11, color: '#9ca3af' }}> ({stats.realtimeHotspots.join(', ')})</span>
+            )}
+          </div>
+        </div>
+      )}
 
       {['A', 'B', 'C', 'D', 'E', 'F'].map((los) => {
         const count = stats.losCounts[los] || 0;

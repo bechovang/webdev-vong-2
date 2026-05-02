@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from db.database import init_db
 from models.xgboost_model import TrafficModel
-from routers import health, predict, segments
+from routers import health, predict, segments, hotspots
 
 app = FastAPI(title="Traffic Prediction API", version="1.0.0")
 
@@ -31,6 +31,7 @@ def startup():
 app.include_router(health.router, tags=["health"])
 app.include_router(predict.router, tags=["predict"])
 app.include_router(segments.router, tags=["segments"])
+app.include_router(hotspots.router, tags=["hotspots"])
 
 
 if __name__ == "__main__":
