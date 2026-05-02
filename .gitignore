@@ -82,6 +82,21 @@ temp/
 # Project specific
 ref app/
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Traffic API artifacts (generated)
+traffic-api/artifacts/
+traffic-api/__pycache__/
+traffic-api/db/__pycache__/
+traffic-api/models/__pycache__/
+traffic-api/routers/__pycache__/
+traffic-api/schemas/__pycache__/
+
+# Archives
+*.rar
 
 WDA2026_THÔNG TIN VÒNG 2/
 .claude/
