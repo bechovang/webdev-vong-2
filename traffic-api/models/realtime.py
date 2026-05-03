@@ -1,7 +1,8 @@
-"""TomTom realtime traffic data: fetch, cache, adjust predictions"""
+"""TomTom realtime traffic data: fetch, cache, adjust predictions."""
 
 import json
 import math
+import os
 import time
 from pathlib import Path
 from typing import Optional
@@ -9,7 +10,6 @@ from typing import Optional
 import requests
 
 HOTSPOTS_PATH = Path(__file__).parent.parent / "data" / "hotspots.json"
-TOMTOM_API_KEY = "ia15bO6j7DQtMReQGLJbtHuYXpfAO9sF"
 FLOW_URL = "https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json"
 
 LOS_ENCODING = {'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5}
@@ -24,17 +24,25 @@ def load_hotspots() -> list[dict]:
         return json.load(f)
 
 
-def fetch_tomtom_flow(lat: float, lng: float) -> Optional[dict]:
+def is_realtime_configured() -> bool:
+    return bool(os.getenv("TOMTOM_API_KEY"))
+
+
+def fetch_tomtom_flow(lat: float, lng: float) -> tuple[Optional[dict], Optional[str]]:
+    api_key = os.getenv("TOMTOM_API_KEY")
+    if not api_key:
+        return None, "Missing TOMTOM_API_KEY"
+
     try:
         resp = requests.get(
             FLOW_URL,
-            params={"point": f"{lat},{lng}", "key": TOMTOM_API_KEY},
+            params={"point": f"{lat},{lng}", "key": api_key},
             timeout=10,
         )
         resp.raise_for_status()
         data = resp.json().get("flowSegmentData")
         if not data:
-            return None
+            return None, "TomTom returned no flowSegmentData"
 
         current_speed = data.get("currentSpeed", 0)
         free_flow = data.get("freeFlowSpeed", 1)
@@ -50,24 +58,53 @@ def fetch_tomtom_flow(lat: float, lng: float) -> Optional[dict]:
             "delay_ratio": current_tt / free_tt if free_tt > 0 else 1.0,
             "confidence": data.get("confidence", 0),
             "road_closure": data.get("roadClosure", False),
-        }
+        }, None
     except Exception as e:
         print(f"TomTom fetch error for ({lat}, {lng}): {e}")
-        return None
+        return None, str(e)
 
 
-def get_hotspot_realtime(hotspot: dict) -> Optional[dict]:
+def get_hotspot_realtime_snapshot(hotspot: dict) -> dict:
     hotspot_id = hotspot["id"]
     now = time.time()
 
     cached = _cache.get(hotspot_id)
     if cached and cached[1] > now:
-        return cached[0]
+        return {
+            "status": "ok",
+            "message": "Using cached TomTom flow data",
+            "realtime": cached[0],
+            "cached": True,
+        }
 
-    data = fetch_tomtom_flow(hotspot["lat"], hotspot["lng"])
+    data, error = fetch_tomtom_flow(hotspot["lat"], hotspot["lng"])
     if data:
         _cache[hotspot_id] = (data, now + TTL_SECONDS)
-    return data
+        return {
+            "status": "ok",
+            "message": "Fetched live TomTom flow data",
+            "realtime": data,
+            "cached": False,
+        }
+
+    if not is_realtime_configured():
+        return {
+            "status": "disabled",
+            "message": "Realtime API is disabled because TOMTOM_API_KEY is missing",
+            "realtime": None,
+            "cached": False,
+        }
+
+    return {
+        "status": "error",
+        "message": error or "Failed to fetch TomTom flow data",
+        "realtime": None,
+        "cached": False,
+    }
+
+
+def get_hotspot_realtime(hotspot: dict) -> Optional[dict]:
+    return get_hotspot_realtime_snapshot(hotspot)["realtime"]
 
 
 def compute_realtime_severity(rt_data: dict) -> int:
@@ -81,18 +118,25 @@ def compute_realtime_severity(rt_data: dict) -> int:
     if rt_data.get("road_closure"):
         return 6
 
-    if speed_ratio < 0.25:
+    # Make the scoring more sensitive so moderate slowdowns show up on the map.
+    if speed_ratio < 0.2:
         score += 3
-    elif speed_ratio < 0.4:
+    elif speed_ratio < 0.35:
         score += 2
-    elif speed_ratio < 0.6:
+    elif speed_ratio < 0.55:
+        score += 2
+    elif speed_ratio < 0.75:
+        score += 1
+    elif speed_ratio < 0.9:
         score += 1
 
-    if delay_ratio > 3.5:
+    if delay_ratio >= 3.0:
         score += 3
-    elif delay_ratio > 2.5:
+    elif delay_ratio >= 2.0:
         score += 2
-    elif delay_ratio > 1.5:
+    elif delay_ratio >= 1.4:
+        score += 1
+    elif delay_ratio >= 1.15:
         score += 1
 
     return min(score, 6)

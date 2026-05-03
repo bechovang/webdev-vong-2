@@ -1,82 +1,18 @@
 [
   {
     "id": "route_001",
-    "name": "Phạm Văn Đồng",
-    "lat": 10.8485,
-    "lng": 106.7785,
-    "radius_meters": 800,
-    "description": "Tuyến cao tốc đông nhất"
+    "name": "Ngã tư Thủ Đức",
+    "lat": 10.8493,
+    "lng": 106.7741,
+    "radius_meters": 700,
+    "description": "Nút giao Xa lộ Hà Nội - Võ Văn Ngân - Lê Văn Việt"
   },
   {
     "id": "route_002",
-    "name": "Xa Lộ Hà Nội",
-    "lat": 10.810,
-    "lng": 106.7835,
-    "radius_meters": 800,
-    "description": "Ùn tắc cao điểm"
-  },
-  {
-    "id": "route_003",
-    "name": "Quốc Lộ 1A",
-    "lat": 10.825,
-    "lng": 106.745,
-    "radius_meters": 800,
-    "description": "Kết nối Thủ Đức - Bình Thạnh"
-  },
-  {
-    "id": "route_004",
-    "name": "Mai Chí Thọ",
-    "lat": 10.7935,
-    "lng": 106.7375,
-    "radius_meters": 800,
-    "description": "Khu Phú Mỹ Hưng gần Thủ Đức"
-  },
-  {
-    "id": "route_005",
-    "name": "Lê Đức Thọ",
-    "lat": 10.835,
-    "lng": 106.7625,
-    "radius_meters": 800,
-    "description": "Khu công nghệ cao"
-  },
-  {
-    "id": "route_006",
-    "name": "Nguyễn Duy Trinh",
-    "lat": 10.800,
-    "lng": 106.7525,
-    "radius_meters": 800,
-    "description": "Khu đô thị mới"
-  },
-  {
-    "id": "route_007",
-    "name": "Đỗ Xuân Hợp",
-    "lat": 10.825,
-    "lng": 106.7425,
-    "radius_meters": 800,
-    "description": "Khu chung cư cao cấp"
-  },
-  {
-    "id": "route_008",
-    "name": "Lý Thường Kiệt",
-    "lat": 10.8425,
-    "lng": 106.7725,
-    "radius_meters": 800,
-    "description": "Khu trường học"
-  },
-  {
-    "id": "route_009",
-    "name": "Võ Nguyên Giáp",
-    "lat": 10.830,
-    "lng": 106.7825,
-    "radius_meters": 800,
-    "description": "Khu cảng Cát Lái"
-  },
-  {
-    "id": "route_010",
-    "name": "Phú Mỹ Hưng - Nguyễn Văn Linh",
-    "lat": 10.745,
-    "lng": 106.685,
-    "radius_meters": 800,
-    "description": "Khu Nam Sài Gòn"
+    "name": "Chợ Thủ Đức",
+    "lat": 10.8508,
+    "lng": 106.7618,
+    "radius_meters": 500,
+    "description": "Khu vực chợ Thủ Đức và trục Võ Văn Ngân - Kha Vạn Cân"
   }
 ]

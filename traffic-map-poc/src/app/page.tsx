@@ -8,6 +8,7 @@ import RouteLayer from '@/components/RouteLayer';
 import RouteSummaryPanel from '@/components/RouteSummaryPanel';
 import { SearchBox, SearchLocationMarker } from '@/components/SearchBox';
 import type { LonLat, RoutePoint } from '@/components/SearchBox';
+import HotspotInspector from '@/components/HotspotInspector';
 import TrafficOverlay from '@/components/TrafficOverlay';
 import TimePicker, { TimeSelection } from '@/components/TimePicker';
 import { useMapPicking, useRouteState, useTrafficSegments } from '@/lib';
@@ -364,9 +365,11 @@ export default function Home() {
 
       <MapView onMapLoad={handleMapLoad} />
 
-      {map && segments.length > 0 && (
+      {map && (
         <TrafficOverlay map={map} segments={segments} timeSelection={timeSelection} />
       )}
+
+      {map && <HotspotInspector map={map} />}
 
       {map && searchLocation && (
         <SearchLocationMarker

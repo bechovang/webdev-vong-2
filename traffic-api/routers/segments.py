@@ -125,7 +125,7 @@ def get_segments(
                         )
                         if dist < h["radius_meters"]:
                             influence = max(0, 1 - dist / h["radius_meters"])
-                            if influence > best_influence and rt["severity"] >= 2:
+                            if influence > best_influence and rt["severity"] >= 1:
                                 best_influence = influence
                                 best_adjustment = adjust_los_by_realtime(
                                     seg.los, seg.confidence or 0.5,
@@ -141,11 +141,12 @@ def get_segments(
                                     "distance_meters": round(dist),
                                 }
 
+                    if best_info:
+                        seg.prediction_source = "xgboost_realtime"
+                        seg.realtime_info = best_info
                     if best_adjustment and best_adjustment["los"] != seg.los:
                         seg.los = best_adjustment["los"]
                         seg.confidence = best_adjustment["confidence"]
-                        seg.prediction_source = "xgboost_realtime"
-                        seg.realtime_info = best_info
 
             segments.append(seg)
 
