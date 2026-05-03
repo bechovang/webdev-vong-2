@@ -8,6 +8,15 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 
 const SOURCE_ID = 'traffic-segments-source';
 const LAYER_ID = 'traffic-segments-layer';
+const REALTIME_GLOW_LAYER_ID = 'traffic-segments-realtime-glow-layer';
+const REALTIME_IMPACT_LAYER_ID = 'traffic-segments-realtime-impact-layer';
+const HOTSPOT_SOURCE_ID = 'traffic-hotspots-source';
+const HOTSPOT_LAYER_ID = 'traffic-hotspots-layer';
+const HOTSPOT_PULSE_LAYER_ID = 'traffic-hotspots-pulse-layer';
+const HOTSPOT_LABEL_LAYER_ID = 'traffic-hotspots-label-layer';
+const HOTSPOT_RADIUS_SOURCE_ID = 'traffic-hotspots-radius-source';
+const HOTSPOT_RADIUS_FILL_LAYER_ID = 'traffic-hotspots-radius-fill-layer';
+const HOTSPOT_RADIUS_LINE_LAYER_ID = 'traffic-hotspots-radius-line-layer';
 
 const LOS_COLORS = {
   A: '#22c55e',
@@ -19,12 +28,12 @@ const LOS_COLORS = {
 };
 
 const LOS_LABELS = {
-  A: 'Thông thoáng',
-  B: 'Khá tốt',
-  C: 'Ổn định',
-  D: 'Bắt đầu kẹt',
-  E: 'Kẹt xe',
-  F: 'Kẹt cứng',
+  A: 'Thong thoang',
+  B: 'Kha tot',
+  C: 'On dinh',
+  D: 'Bat dau ket',
+  E: 'Ket xe',
+  F: 'Ket cung',
 };
 
 export interface TrafficSegment {
@@ -51,6 +60,26 @@ export interface TrafficSegment {
   };
 }
 
+type TrafficHotspot = {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  radius_meters: number;
+  description?: string;
+  realtime?: {
+    current_speed: number;
+    free_flow_speed: number;
+    speed_ratio: number;
+    current_travel_time: number;
+    free_flow_travel_time: number;
+    delay_ratio: number;
+    confidence: number;
+    road_closure: boolean;
+    severity?: number;
+  } | null;
+};
+
 interface TrafficOverlayProps {
   map: maplibregl.Map | null;
   segments: TrafficSegment[];
@@ -70,6 +99,18 @@ type SegmentFeatureProperties = {
   realtime_hotspot: string;
   realtime_speed_ratio: number;
   realtime_influence: number;
+  realtime_severity: number;
+};
+
+type HotspotFeatureProperties = {
+  id: string;
+  name: string;
+  description: string;
+  radius_meters: number;
+  severity: number;
+  speed_ratio: number;
+  delay_ratio: number;
+  road_closure: boolean;
 };
 
 export const TrafficOverlay: React.FC<TrafficOverlayProps> = ({
@@ -77,33 +118,94 @@ export const TrafficOverlay: React.FC<TrafficOverlayProps> = ({
   segments,
   timeSelection,
 }) => {
-  const popupRef = useRef<maplibregl.Popup | null>(null);
+  const segmentPopupRef = useRef<maplibregl.Popup | null>(null);
+  const hotspotPopupRef = useRef<maplibregl.Popup | null>(null);
   const hoveredSegmentIdRef = useRef<number | null>(null);
   const { getCachedPrediction } = useTrafficPredictionCache();
+  const [hotspots, setHotspots] = useState<TrafficHotspot[]>([]);
 
   const segmentsWithLOS = useMemo(() => {
-    // If segments already have LOS from XGBoost API, use them directly
-    const hasAPILos = segments.length > 0 && segments.some(s => s.los !== undefined);
+    const hasAPILos = segments.length > 0 && segments.some((segment) => segment.los !== undefined);
     if (hasAPILos) {
-      return segments.map(s => ({
-        ...s,
-        los: s.los || 'C',
-        confidence: s.confidence || 0.5,
+      return segments.map((segment) => ({
+        ...segment,
+        los: segment.los || 'C',
+        confidence: segment.confidence || 0.5,
       }));
     }
-    // Fallback to heuristic
+
     return getCachedPrediction(segments, timeSelection, simulateLOSBatch);
   }, [segments, timeSelection, getCachedPrediction]);
 
-  const geoJsonData = useMemo(() => segmentsToGeoJSON(segmentsWithLOS), [segmentsWithLOS]);
-  const stats = useMemo(() => calculateStats(segmentsWithLOS), [segmentsWithLOS]);
+  const geoJsonData = useMemo(
+    () => segmentsToGeoJSON(segmentsWithLOS),
+    [segmentsWithLOS],
+  );
+  const stats = useMemo(
+    () => calculateStats(segmentsWithLOS),
+    [segmentsWithLOS],
+  );
   const isPrediction = timeSelection.type !== 'preset' || timeSelection.horizon !== 'now';
+
+  const visibleHotspots = useMemo(() => {
+    if (!map) return hotspots;
+
+    const bounds = map.getBounds();
+    return hotspots.filter((hotspot) => (
+      hotspot.lat >= bounds.getSouth() - 0.02
+      && hotspot.lat <= bounds.getNorth() + 0.02
+      && hotspot.lng >= bounds.getWest() - 0.02
+      && hotspot.lng <= bounds.getEast() + 0.02
+    ));
+  }, [hotspots, map]);
+
+  const hotspotGeoJsonData = useMemo(
+    () => hotspotsToGeoJSON(visibleHotspots),
+    [visibleHotspots],
+  );
+  const hotspotRadiusGeoJsonData = useMemo(
+    () => hotspotRadiusToGeoJSON(visibleHotspots),
+    [visibleHotspots],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadHotspots = async () => {
+      try {
+        const response = await fetch('/api/hotspots', { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`Hotspots request failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (!cancelled) {
+          setHotspots(Array.isArray(data.hotspots) ? data.hotspots : []);
+        }
+      } catch (error) {
+        console.error('Failed to load hotspots:', error);
+        if (!cancelled) {
+          setHotspots([]);
+        }
+      }
+    };
+
+    void loadHotspots();
+    const timer = window.setInterval(() => {
+      void loadHotspots();
+    }, 90000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     if (!map) return;
 
-    if (!popupRef.current) {
-      popupRef.current = new maplibregl.Popup({
+    if (!segmentPopupRef.current) {
+      segmentPopupRef.current = new maplibregl.Popup({
         closeButton: false,
         closeOnClick: false,
         maxWidth: '320px',
@@ -111,10 +213,26 @@ export const TrafficOverlay: React.FC<TrafficOverlayProps> = ({
       });
     }
 
+    if (!hotspotPopupRef.current) {
+      hotspotPopupRef.current = new maplibregl.Popup({
+        closeButton: false,
+        closeOnClick: true,
+        maxWidth: '320px',
+        offset: 16,
+      });
+    }
+
     const onMouseMove = (event: maplibregl.MapMouseEvent) => {
+      if (!map.getLayer(LAYER_ID)) {
+        hoveredSegmentIdRef.current = null;
+        segmentPopupRef.current?.remove();
+        map.getCanvas().style.cursor = '';
+        return;
+      }
+
       if (map.getZoom() < 15) {
         hoveredSegmentIdRef.current = null;
-        popupRef.current?.remove();
+        segmentPopupRef.current?.remove();
         map.getCanvas().style.cursor = '';
         return;
       }
@@ -125,7 +243,7 @@ export const TrafficOverlay: React.FC<TrafficOverlayProps> = ({
 
       if (features.length === 0) {
         hoveredSegmentIdRef.current = null;
-        popupRef.current?.remove();
+        segmentPopupRef.current?.remove();
         map.getCanvas().style.cursor = '';
         return;
       }
@@ -141,35 +259,36 @@ export const TrafficOverlay: React.FC<TrafficOverlayProps> = ({
 
       if (hoveredSegmentIdRef.current !== props.segment_id) {
         hoveredSegmentIdRef.current = props.segment_id;
-        popupRef.current
+        segmentPopupRef.current
           ?.setLngLat(anchor)
-          .setHTML(buildPopupHtml(props))
+          .setHTML(buildSegmentPopupHtml(props))
           .addTo(map);
       } else {
-        popupRef.current?.setLngLat(anchor);
+        segmentPopupRef.current?.setLngLat(anchor);
       }
     };
 
     const onMouseLeave = () => {
       hoveredSegmentIdRef.current = null;
-      popupRef.current?.remove();
+      segmentPopupRef.current?.remove();
       map.getCanvas().style.cursor = '';
     };
 
     map.on('mousemove', onMouseMove);
-    map.on('mouseleave', LAYER_ID, onMouseLeave);
+    map.on('mouseout', onMouseLeave);
 
     return () => {
       map.off('mousemove', onMouseMove);
-      map.off('mouseleave', LAYER_ID, onMouseLeave);
-      popupRef.current?.remove();
+      map.off('mouseout', onMouseLeave);
+      segmentPopupRef.current?.remove();
+      hotspotPopupRef.current?.remove();
     };
   }, [map]);
 
   useEffect(() => {
     if (!map) return;
 
-    const applyData = () => {
+    const applySegments = () => {
       const existingSource = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
 
       if (!existingSource) {
@@ -217,30 +336,380 @@ export const TrafficOverlay: React.FC<TrafficOverlayProps> = ({
             'line-cap': 'round',
           },
         });
+
+        map.addLayer({
+          id: REALTIME_GLOW_LAYER_ID,
+          type: 'line',
+          source: SOURCE_ID,
+          filter: ['==', ['get', 'prediction_source'], 'xgboost_realtime'],
+          paint: {
+            'line-color': '#a855f7',
+            'line-width': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              10, 5,
+              13, 8,
+              15, 12,
+              17, 16,
+            ],
+            'line-opacity': [
+              'interpolate',
+              ['linear'],
+              ['get', 'realtime_influence'],
+              0, 0,
+              0.2, 0.2,
+              0.5, 0.35,
+              1, 0.55,
+            ],
+            'line-blur': 1.2,
+          },
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+          },
+        });
+
+        map.addLayer({
+          id: REALTIME_IMPACT_LAYER_ID,
+          type: 'line',
+          source: SOURCE_ID,
+          filter: ['==', ['get', 'prediction_source'], 'xgboost_realtime'],
+          paint: {
+            'line-color': [
+              'interpolate',
+              ['linear'],
+              ['get', 'realtime_influence'],
+              0, '#c084fc',
+              0.35, '#a855f7',
+              0.7, '#7c3aed',
+              1, '#6d28d9',
+            ],
+            'line-width': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              10, 2.5,
+              13, 3.5,
+              15, 5.5,
+              17, 7.5,
+            ],
+            'line-opacity': 0.95,
+            'line-dasharray': [1.4, 1.2],
+          },
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+          },
+        });
       } else {
         existingSource.setData(geoJsonData);
       }
     };
 
     if (map.isStyleLoaded()) {
-      applyData();
+      applySegments();
       return;
     }
 
-    map.once('load', applyData);
+    map.once('load', applySegments);
     return () => {
-      map.off('load', applyData);
+      map.off('load', applySegments);
     };
   }, [geoJsonData, map]);
 
   useEffect(() => {
     if (!map) return;
 
+    const applyHotspots = () => {
+      const existingHotspotSource = map.getSource(HOTSPOT_SOURCE_ID) as GeoJSONSource | undefined;
+      const existingRadiusSource = map.getSource(HOTSPOT_RADIUS_SOURCE_ID) as GeoJSONSource | undefined;
+
+      if (!existingRadiusSource) {
+        map.addSource(HOTSPOT_RADIUS_SOURCE_ID, {
+          type: 'geojson',
+          data: hotspotRadiusGeoJsonData,
+        });
+
+        map.addLayer({
+          id: HOTSPOT_RADIUS_FILL_LAYER_ID,
+          type: 'fill',
+          source: HOTSPOT_RADIUS_SOURCE_ID,
+          paint: {
+            'fill-color': [
+              'step',
+              ['get', 'severity'],
+              '#cbd5e1',
+              2, '#fde68a',
+              4, '#fb923c',
+              6, '#ef4444',
+            ],
+            'fill-opacity': [
+              'case',
+              ['>=', ['get', 'severity'], 2],
+              0.12,
+              0.04,
+            ],
+          },
+        });
+
+        map.addLayer({
+          id: HOTSPOT_RADIUS_LINE_LAYER_ID,
+          type: 'line',
+          source: HOTSPOT_RADIUS_SOURCE_ID,
+          paint: {
+            'line-color': [
+              'step',
+              ['get', 'severity'],
+              '#94a3b8',
+              2, '#f59e0b',
+              4, '#ea580c',
+              6, '#dc2626',
+            ],
+            'line-width': 1.5,
+            'line-opacity': [
+              'case',
+              ['>=', ['get', 'severity'], 2],
+              0.55,
+              0.25,
+            ],
+          },
+        });
+      } else {
+        existingRadiusSource.setData(hotspotRadiusGeoJsonData);
+      }
+
+      if (!existingHotspotSource) {
+        map.addSource(HOTSPOT_SOURCE_ID, {
+          type: 'geojson',
+          data: hotspotGeoJsonData,
+        });
+
+        map.addLayer({
+          id: HOTSPOT_PULSE_LAYER_ID,
+          type: 'circle',
+          source: HOTSPOT_SOURCE_ID,
+          paint: {
+            'circle-radius': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              10, 10,
+              13, 14,
+              15, 18,
+            ],
+            'circle-color': [
+              'step',
+              ['get', 'severity'],
+              '#94a3b8',
+              2, '#fbbf24',
+              4, '#fb923c',
+              6, '#ef4444',
+            ],
+            'circle-opacity': [
+              'case',
+              ['>=', ['get', 'severity'], 2],
+              0.18,
+              0.08,
+            ],
+            'circle-blur': 0.9,
+          },
+        });
+
+        map.addLayer({
+          id: HOTSPOT_LAYER_ID,
+          type: 'circle',
+          source: HOTSPOT_SOURCE_ID,
+          paint: {
+            'circle-radius': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              10, 6,
+              13, 9,
+              15, 12,
+            ],
+            'circle-color': [
+              'step',
+              ['get', 'severity'],
+              '#64748b',
+              2, '#f59e0b',
+              4, '#f97316',
+              6, '#dc2626',
+            ],
+            'circle-stroke-color': '#ffffff',
+            'circle-stroke-width': 2,
+            'circle-opacity': [
+              'case',
+              ['>=', ['get', 'severity'], 2],
+              0.95,
+              0.55,
+            ],
+          },
+        });
+
+        map.addLayer({
+          id: HOTSPOT_LABEL_LAYER_ID,
+          type: 'symbol',
+          source: HOTSPOT_SOURCE_ID,
+          layout: {
+            'text-field': ['get', 'name'],
+            'text-size': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              11, 10,
+              14, 11,
+              16, 12,
+            ],
+            'text-font': ['Open Sans Semibold'],
+            'text-offset': [0, 1.4],
+            'text-anchor': 'top',
+          },
+          paint: {
+            'text-color': '#7c2d12',
+            'text-halo-color': '#ffffff',
+            'text-halo-width': 1.5,
+            'text-opacity': [
+              'step',
+              ['zoom'],
+              0,
+              12, [
+                'case',
+                ['>=', ['get', 'severity'], 2],
+                0.95,
+                0.55,
+              ],
+            ],
+          },
+        });
+      } else {
+        existingHotspotSource.setData(hotspotGeoJsonData);
+      }
+    };
+
+    const showHotspotPopup = (feature: MapGeoJSONFeature) => {
+      const props = feature.properties as unknown as HotspotFeatureProperties;
+      if (!props) return;
+
+      let anchor: [number, number] | null = null;
+
+      if (feature.geometry.type === 'Point') {
+        anchor = feature.geometry.coordinates as [number, number];
+      } else if (feature.geometry.type === 'Polygon') {
+        const ring = feature.geometry.coordinates[0];
+        if (ring && ring.length > 0) {
+          anchor = ring[0] as [number, number];
+        }
+      }
+
+      if (!anchor) return;
+
+      hotspotPopupRef.current
+        ?.setLngLat(anchor)
+        .setHTML(buildHotspotPopupHtml(props))
+        .addTo(map);
+    };
+
+    const getInteractiveHotspotLayerIds = () => {
+      const layerIds = [HOTSPOT_LAYER_ID, HOTSPOT_RADIUS_FILL_LAYER_ID];
+      return layerIds.filter((layerId) => Boolean(map.getLayer(layerId)));
+    };
+
+    const onHotspotClick = (event: maplibregl.MapMouseEvent) => {
+      const interactiveLayerIds = getInteractiveHotspotLayerIds();
+      if (interactiveLayerIds.length === 0) {
+        return;
+      }
+
+      const feature = map.queryRenderedFeatures(event.point, {
+        layers: interactiveLayerIds,
+      })[0] as MapGeoJSONFeature | undefined;
+      if (!feature) return;
+      showHotspotPopup(feature);
+    };
+
+    const onHotspotMove = (event: maplibregl.MapMouseEvent) => {
+      const interactiveLayerIds = getInteractiveHotspotLayerIds();
+      if (interactiveLayerIds.length === 0) {
+        map.getCanvas().style.cursor = '';
+        return;
+      }
+
+      const hasHotspot = map.queryRenderedFeatures(event.point, {
+        layers: interactiveLayerIds,
+      }).length > 0;
+
+      map.getCanvas().style.cursor = hasHotspot ? 'pointer' : '';
+    };
+
+    const onHotspotMouseOut = () => {
+      map.getCanvas().style.cursor = '';
+    };
+
+    if (map.isStyleLoaded()) {
+      applyHotspots();
+    } else {
+      map.once('load', applyHotspots);
+    }
+
+    map.on('click', onHotspotClick);
+    map.on('mousemove', onHotspotMove);
+    map.on('mouseout', onHotspotMouseOut);
+
     return () => {
-      popupRef.current?.remove();
+      map.off('click', onHotspotClick);
+      map.off('mousemove', onHotspotMove);
+      map.off('mouseout', onHotspotMouseOut);
+      map.off('load', applyHotspots);
+    };
+  }, [hotspotGeoJsonData, hotspotRadiusGeoJsonData, map]);
+
+  useEffect(() => {
+    if (!map) return;
+
+    return () => {
+      segmentPopupRef.current?.remove();
+      hotspotPopupRef.current?.remove();
+
+      if (map.getLayer(HOTSPOT_LAYER_ID)) {
+        map.removeLayer(HOTSPOT_LAYER_ID);
+      }
+
+      if (map.getLayer(HOTSPOT_PULSE_LAYER_ID)) {
+        map.removeLayer(HOTSPOT_PULSE_LAYER_ID);
+      }
+
+      if (map.getLayer(HOTSPOT_LABEL_LAYER_ID)) {
+        map.removeLayer(HOTSPOT_LABEL_LAYER_ID);
+      }
+
+      if (map.getLayer(HOTSPOT_RADIUS_LINE_LAYER_ID)) {
+        map.removeLayer(HOTSPOT_RADIUS_LINE_LAYER_ID);
+      }
+
+      if (map.getLayer(HOTSPOT_RADIUS_FILL_LAYER_ID)) {
+        map.removeLayer(HOTSPOT_RADIUS_FILL_LAYER_ID);
+      }
 
       if (map.getLayer(LAYER_ID)) {
         map.removeLayer(LAYER_ID);
+      }
+
+      if (map.getLayer(REALTIME_IMPACT_LAYER_ID)) {
+        map.removeLayer(REALTIME_IMPACT_LAYER_ID);
+      }
+
+      if (map.getLayer(REALTIME_GLOW_LAYER_ID)) {
+        map.removeLayer(REALTIME_GLOW_LAYER_ID);
+      }
+
+      if (map.getSource(HOTSPOT_SOURCE_ID)) {
+        map.removeSource(HOTSPOT_SOURCE_ID);
+      }
+
+      if (map.getSource(HOTSPOT_RADIUS_SOURCE_ID)) {
+        map.removeSource(HOTSPOT_RADIUS_SOURCE_ID);
       }
 
       if (map.getSource(SOURCE_ID)) {
@@ -258,18 +727,22 @@ export const TrafficOverlay: React.FC<TrafficOverlayProps> = ({
           isPrediction={isPrediction}
           stats={stats}
           timeSelection={timeSelection}
+          hotspots={visibleHotspots}
         />
       ) : (
         <>
           <LOSLegend isPrediction={isPrediction} />
           <StatsPanel stats={stats} timeSelection={timeSelection} />
+          <RealtimeImpactPanel stats={stats} hotspots={visibleHotspots} />
         </>
       )}
     </>
   );
 };
 
-function segmentsToGeoJSON(segments: TrafficSegment[]): GeoJSON.FeatureCollection<GeoJSON.LineString, SegmentFeatureProperties> {
+function segmentsToGeoJSON(
+  segments: TrafficSegment[],
+): GeoJSON.FeatureCollection<GeoJSON.LineString, SegmentFeatureProperties> {
   return {
     type: 'FeatureCollection',
     features: segments.map((segment) => {
@@ -289,6 +762,7 @@ function segmentsToGeoJSON(segments: TrafficSegment[]): GeoJSON.FeatureCollectio
           realtime_hotspot: segment.realtime_info?.hotspot_name || '',
           realtime_speed_ratio: segment.realtime_info?.speed_ratio || 0,
           realtime_influence: segment.realtime_info?.influence || 0,
+          realtime_severity: segment.realtime_info?.severity || 0,
         },
         geometry: {
           type: 'LineString',
@@ -302,7 +776,57 @@ function segmentsToGeoJSON(segments: TrafficSegment[]): GeoJSON.FeatureCollectio
   };
 }
 
-function buildPopupHtml(props: SegmentFeatureProperties) {
+function hotspotsToGeoJSON(
+  hotspots: TrafficHotspot[],
+): GeoJSON.FeatureCollection<GeoJSON.Point, HotspotFeatureProperties> {
+  return {
+    type: 'FeatureCollection',
+    features: hotspots.map((hotspot) => ({
+      type: 'Feature',
+      properties: {
+        id: hotspot.id,
+        name: hotspot.name,
+        description: hotspot.description || '',
+        radius_meters: hotspot.radius_meters,
+        severity: hotspot.realtime?.severity || 0,
+        speed_ratio: hotspot.realtime?.speed_ratio || 1,
+        delay_ratio: hotspot.realtime?.delay_ratio || 1,
+        road_closure: hotspot.realtime?.road_closure || false,
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: [hotspot.lng, hotspot.lat],
+      },
+    })),
+  };
+}
+
+function hotspotRadiusToGeoJSON(
+  hotspots: TrafficHotspot[],
+): GeoJSON.FeatureCollection<GeoJSON.Polygon, HotspotFeatureProperties> {
+  return {
+    type: 'FeatureCollection',
+    features: hotspots.map((hotspot) => ({
+      type: 'Feature',
+      properties: {
+        id: hotspot.id,
+        name: hotspot.name,
+        description: hotspot.description || '',
+        radius_meters: hotspot.radius_meters,
+        severity: hotspot.realtime?.severity || 0,
+        speed_ratio: hotspot.realtime?.speed_ratio || 1,
+        delay_ratio: hotspot.realtime?.delay_ratio || 1,
+        road_closure: hotspot.realtime?.road_closure || false,
+      },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [buildCircleRing(hotspot.lat, hotspot.lng, hotspot.radius_meters)],
+      },
+    })),
+  };
+}
+
+function buildSegmentPopupHtml(props: SegmentFeatureProperties) {
   const sourceLabel = props.prediction_source === 'xgboost_realtime'
     ? 'XGBoost + Realtime'
     : props.prediction_source === 'xgboost'
@@ -313,8 +837,8 @@ function buildPopupHtml(props: SegmentFeatureProperties) {
     ? `<div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #e5e7eb;">
         <div style="font-size: 11px; font-weight: 600; color: #7c3aed; margin-bottom: 3px;">Realtime Data</div>
         <div style="font-size: 11px; color: #6b7280;">Hotspot: ${props.realtime_hotspot}</div>
-        <div style="font-size: 11px; color: #6b7280;">Tốc độ/Free flow: ${(props.realtime_speed_ratio * 100).toFixed(0)}%</div>
-        <div style="font-size: 11px; color: #6b7280;">Ảnh hưởng: ${(props.realtime_influence * 100).toFixed(0)}%</div>
+        <div style="font-size: 11px; color: #6b7280;">Speed / free flow: ${(props.realtime_speed_ratio * 100).toFixed(0)}%</div>
+        <div style="font-size: 11px; color: #6b7280;">Influence: ${(props.realtime_influence * 100).toFixed(0)}%</div>
       </div>`
     : '';
 
@@ -326,20 +850,38 @@ function buildPopupHtml(props: SegmentFeatureProperties) {
         <div style="font-size: 14px; font-weight: 600;">${props.label}</div>
       </div>
       <div style="font-size: 12px; color: #4b5563; line-height: 1.6;">
-        <div>Độ tin cậy: ${(props.confidence * 100).toFixed(0)}%</div>
-        <div>Nguồn: ${sourceLabel}</div>
-        <div>Cấp đường: ${props.street_level}</div>
-        <div>Vận tốc tối đa: ${props.max_velocity} km/h</div>
-        <div>Chiều dài: ${Math.round(props.length)} m</div>
+        <div>Confidence: ${(props.confidence * 100).toFixed(0)}%</div>
+        <div>Source: ${sourceLabel}</div>
+        <div>Street level: ${props.street_level}</div>
+        <div>Speed limit: ${props.max_velocity} km/h</div>
+        <div>Length: ${Math.round(props.length)} m</div>
       </div>
       ${realtimeSection}
     </div>
   `;
 }
 
+function buildHotspotPopupHtml(props: HotspotFeatureProperties) {
+  return `
+    <div style="font-family: system-ui, sans-serif; padding: 4px 2px; min-width: 240px;">
+      <div style="font-size: 13px; font-weight: 700; color: #111827; margin-bottom: 4px;">${props.name}</div>
+      <div style="font-size: 12px; color: #6b7280; margin-bottom: 8px;">${props.description}</div>
+      <div style="display: inline-flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 4px 8px; border-radius: 999px; background: #fff7ed; color: #c2410c; font-size: 11px; font-weight: 700;">
+        ${getHotspotSeverityLabel(props.severity)}
+      </div>
+      <div style="font-size: 12px; color: #4b5563; line-height: 1.7;">
+        <div>Radius: ${Math.round(props.radius_meters)} m</div>
+        <div>Speed / free flow: ${(props.speed_ratio * 100).toFixed(0)}%</div>
+        <div>Delay ratio: ${props.delay_ratio.toFixed(2)}x</div>
+        <div>Road closure: ${props.road_closure ? 'Yes' : 'No'}</div>
+      </div>
+    </div>
+  `;
+}
+
 function simulateLOSBatch(
   segments: TrafficSegment[],
-  timeSelection: TimeSelection
+  timeSelection: TimeSelection,
 ): TrafficSegment[] {
   let targetTime: Date;
   let targetWeekday: number;
@@ -365,10 +907,10 @@ function simulateLOSBatch(
   const isRushHour = (hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19);
   const isNight = hour >= 22 || hour <= 6;
 
-  return segments.map((seg) => {
+  return segments.map((segment) => {
     let los: string;
     let confidence: number;
-    const isMajorRoad = seg.street_level === 1;
+    const isMajorRoad = segment.street_level === 1;
 
     if (isNight) {
       los = 'A';
@@ -403,22 +945,26 @@ function simulateLOSBatch(
       confidence = 0.75;
     }
 
-    return { ...seg, los, confidence };
+    return { ...segment, los, confidence };
   });
 }
 
 function calculateStats(segments: TrafficSegment[]) {
   const losCounts: Record<string, number> = {};
-  segments.forEach((seg) => {
-    const los = seg.los || 'C';
+  segments.forEach((segment) => {
+    const los = segment.los || 'C';
     losCounts[los] = (losCounts[los] || 0) + 1;
   });
 
   const total = segments.length;
   const congested = (losCounts.E || 0) + (losCounts.F || 0);
   const congestedPercent = total > 0 ? ((congested / total) * 100).toFixed(1) : '0';
-  const realtimeAdjusted = segments.filter(s => s.prediction_source === 'xgboost_realtime').length;
-  const realtimeSources = new Set(segments.filter(s => s.realtime_info).map(s => s.realtime_info!.hotspot_name));
+  const realtimeAdjusted = segments.filter((segment) => segment.prediction_source === 'xgboost_realtime').length;
+  const realtimeSources = new Set(
+    segments
+      .filter((segment) => segment.realtime_info)
+      .map((segment) => segment.realtime_info!.hotspot_name),
+  );
 
   return {
     total,
@@ -429,6 +975,33 @@ function calculateStats(segments: TrafficSegment[]) {
     realtimeHotspotCount: realtimeSources.size,
     realtimeHotspots: Array.from(realtimeSources),
   };
+}
+
+function buildCircleRing(lat: number, lng: number, radiusMeters: number): [number, number][] {
+  const points = 48;
+  const ring: [number, number][] = [];
+  const latRadians = lat * Math.PI / 180;
+  const latMeters = 111320;
+  const lngMeters = Math.max(111320 * Math.cos(latRadians), 1);
+
+  for (let i = 0; i <= points; i += 1) {
+    const angle = (i / points) * Math.PI * 2;
+    const dx = Math.cos(angle) * radiusMeters;
+    const dy = Math.sin(angle) * radiusMeters;
+    ring.push([
+      lng + dx / lngMeters,
+      lat + dy / latMeters,
+    ]);
+  }
+
+  return ring;
+}
+
+function getHotspotSeverityLabel(severity: number) {
+  if (severity >= 6) return 'Critical hotspot';
+  if (severity >= 4) return 'Heavy realtime congestion';
+  if (severity >= 2) return 'Moderate hotspot';
+  return 'Monitoring hotspot';
 }
 
 const LOSLegend: React.FC<{ isPrediction?: boolean }> = ({ isPrediction = false }) => {
@@ -448,7 +1021,7 @@ const LOSLegend: React.FC<{ isPrediction?: boolean }> = ({ isPrediction = false 
       }}
     >
       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
-        {isPrediction ? 'LOS Dự báo' : 'LOS Hiện tại'}
+        {isPrediction ? 'LOS du bao' : 'LOS hien tai'}
       </div>
 
       {Object.entries(LOS_COLORS).map(([los, color]) => (
@@ -475,6 +1048,19 @@ const LOSLegend: React.FC<{ isPrediction?: boolean }> = ({ isPrediction = false 
           </span>
         </div>
       ))}
+
+      <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #e5e7eb' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+          <div style={{ width: 24, height: 8, borderRadius: 999, background: '#7c3aed', boxShadow: '0 0 12px rgba(124,58,237,0.55)' }} />
+          <span>
+            <strong style={{ color: '#7c3aed' }}>Realtime</strong> - segment bi API realtime dieu chinh
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#f97316', boxShadow: '0 0 0 6px rgba(249,115,22,0.18)' }} />
+          <span>Hotspot dam mau hon khi severity cao</span>
+        </div>
+      </div>
     </div>
   );
 };
@@ -486,8 +1072,8 @@ const StatsPanel: React.FC<{
   const getTimeLabel = () => {
     if (timeSelection.type === 'preset') {
       const horizon = timeSelection.horizon || 'now';
-      if (horizon === 'now') return 'Hiện tại';
-      return `+${horizon.slice(1)} phút`;
+      if (horizon === 'now') return 'Hien tai';
+      return `+${horizon.slice(1)} phut`;
     }
 
     return timeSelection.customTime?.toLocaleTimeString('vi-VN', {
@@ -511,22 +1097,22 @@ const StatsPanel: React.FC<{
         minWidth: 240,
       }}
     >
-      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 14 }}>Thống kê giao thông</div>
+      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 14 }}>Thong ke giao thong</div>
 
       <div style={{ padding: '12px', background: '#f8f9fa', borderRadius: 10, marginBottom: 14 }}>
-        <div style={{ fontSize: 12, color: '#666', marginBottom: 6, fontWeight: 500 }}>Thời gian</div>
+        <div style={{ fontSize: 12, color: '#666', marginBottom: 6, fontWeight: 500 }}>Thoi gian</div>
         <div style={{ fontSize: 18, fontWeight: 700, color: '#1f2937' }}>{getTimeLabel()}</div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
         <div>
-          <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Đoạn đường hiển thị</div>
+          <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Doan duong hien thi</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: '#1976d2' }}>
             {stats.total.toLocaleString()}
           </div>
         </div>
         <div>
-          <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Đang kẹt</div>
+          <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Dang ket</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: '#ef4444' }}>
             {stats.congested.toLocaleString()}
           </div>
@@ -534,7 +1120,7 @@ const StatsPanel: React.FC<{
       </div>
 
       <div style={{ fontSize: 12, color: '#666', marginBottom: 10 }}>
-        Tỷ lệ kẹt xe: <strong>{stats.congestedPercent}%</strong>
+        Ty le ket xe: <strong>{stats.congestedPercent}%</strong>
       </div>
 
       {stats.realtimeAdjusted > 0 && (
@@ -581,20 +1167,95 @@ const StatsPanel: React.FC<{
   );
 };
 
-export default TrafficOverlay;
+const RealtimeImpactPanel: React.FC<{
+  stats: ReturnType<typeof calculateStats>;
+  hotspots: TrafficHotspot[];
+}> = ({ stats, hotspots }) => {
+  const activeHotspots = hotspots
+    .filter((hotspot) => (hotspot.realtime?.severity || 0) >= 2)
+    .sort((a, b) => (b.realtime?.severity || 0) - (a.realtime?.severity || 0));
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        right: 10,
+        bottom: 20,
+        zIndex: 1050,
+        width: 320,
+        background: 'rgba(15,23,42,0.92)',
+        color: 'white',
+        padding: 16,
+        borderRadius: 16,
+        boxShadow: '0 12px 30px rgba(15,23,42,0.28)',
+        backdropFilter: 'blur(12px)',
+      }}
+    >
+      <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: 0.2, marginBottom: 8 }}>
+        Realtime Impact
+      </div>
+      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.72)', lineHeight: 1.55, marginBottom: 14 }}>
+        Segment vien tim la doan duong ma API realtime da lam thay doi ket qua du bao.
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+        <div style={{ padding: 12, borderRadius: 12, background: 'rgba(255,255,255,0.08)' }}>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', marginBottom: 4 }}>Adjusted segments</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: '#c084fc' }}>{stats.realtimeAdjusted}</div>
+        </div>
+        <div style={{ padding: 12, borderRadius: 12, background: 'rgba(255,255,255,0.08)' }}>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', marginBottom: 4 }}>Active hotspots</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: '#fb923c' }}>{activeHotspots.length}</div>
+        </div>
+      </div>
+
+      {activeHotspots.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {activeHotspots.slice(0, 4).map((hotspot) => (
+            <div
+              key={hotspot.id}
+              style={{
+                padding: '10px 12px',
+                borderRadius: 12,
+                background: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.08)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>{hotspot.name}</div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#fdba74' }}>
+                  S{hotspot.realtime?.severity || 0}
+                </div>
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.68)', marginTop: 4 }}>
+                Speed {(100 * (hotspot.realtime?.speed_ratio || 1)).toFixed(0)}% · Delay {(hotspot.realtime?.delay_ratio || 1).toFixed(2)}x
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)' }}>
+          Chua co hotspot severity {'>='} 2 trong khung nhin hien tai.
+        </div>
+      )}
+    </div>
+  );
+};
 
 const MobileTrafficOverlay: React.FC<{
   isPrediction: boolean;
   stats: ReturnType<typeof calculateStats>;
   timeSelection: TimeSelection;
-}> = ({ isPrediction, stats, timeSelection }) => {
+  hotspots: TrafficHotspot[];
+}> = ({ isPrediction, stats, timeSelection, hotspots }) => {
   const [open, setOpen] = useState(false);
+  const activeHotspots = hotspots.filter((hotspot) => (hotspot.realtime?.severity || 0) >= 2);
 
   const getTimeLabel = () => {
     if (timeSelection.type === 'preset') {
       const horizon = timeSelection.horizon || 'now';
-      if (horizon === 'now') return 'Hiện tại';
-      return `+${horizon.slice(1)} phút`;
+      if (horizon === 'now') return 'Hien tai';
+      return `+${horizon.slice(1)} phut`;
     }
     return timeSelection.customTime?.toLocaleTimeString('vi-VN', {
       hour: '2-digit',
@@ -605,7 +1266,6 @@ const MobileTrafficOverlay: React.FC<{
 
   return (
     <>
-      {/* Toggle button */}
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -631,7 +1291,6 @@ const MobileTrafficOverlay: React.FC<{
         &#9776;
       </button>
 
-      {/* Expanded panel */}
       {open && (
         <div
           style={{
@@ -649,10 +1308,9 @@ const MobileTrafficOverlay: React.FC<{
           }}
         >
           <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>
-            {isPrediction ? 'LOS Dự báo' : 'LOS Hiện tại'}
+            {isPrediction ? 'LOS du bao' : 'LOS hien tai'}
           </div>
 
-          {/* Legend inline */}
           {Object.entries(LOS_COLORS).map(([los, color]) => (
             <div key={los} style={{ display: 'flex', alignItems: 'center', marginBottom: 6, gap: 8 }}>
               <div style={{ width: 20, height: 6, background: color, borderRadius: 999 }} />
@@ -664,25 +1322,36 @@ const MobileTrafficOverlay: React.FC<{
 
           <div style={{ borderTop: '1px solid #e5e7eb', margin: '10px 0' }} />
 
-          {/* Stats */}
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Thống kê giao thông</div>
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Thong ke giao thong</div>
           <div style={{ padding: '10px', background: '#f8f9fa', borderRadius: 10, marginBottom: 10 }}>
-            <div style={{ fontSize: 12, color: '#666', marginBottom: 4, fontWeight: 500 }}>Thời gian</div>
+            <div style={{ fontSize: 12, color: '#666', marginBottom: 4, fontWeight: 500 }}>Thoi gian</div>
             <div style={{ fontSize: 16, fontWeight: 700, color: '#1f2937' }}>{getTimeLabel()}</div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
             <div>
-              <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Đoạn đường hiển thị</div>
+              <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Doan duong hien thi</div>
               <div style={{ fontSize: 20, fontWeight: 700, color: '#1976d2' }}>{stats.total.toLocaleString()}</div>
             </div>
             <div>
-              <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Đang kẹt</div>
+              <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Dang ket</div>
               <div style={{ fontSize: 20, fontWeight: 700, color: '#ef4444' }}>{stats.congested.toLocaleString()}</div>
             </div>
           </div>
           <div style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
-            Tỷ lệ kẹt xe: <strong>{stats.congestedPercent}%</strong>
+            Ty le ket xe: <strong>{stats.congestedPercent}%</strong>
           </div>
+
+          {stats.realtimeAdjusted > 0 && (
+            <div style={{ padding: '10px 12px', background: '#f0e6ff', borderRadius: 10, marginBottom: 10, borderLeft: '3px solid #7c3aed' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', marginBottom: 4 }}>Realtime Adjustment</div>
+              <div style={{ fontSize: 12, color: '#4b5563', marginBottom: 2 }}>
+                Segments adjusted: <strong>{stats.realtimeAdjusted}</strong>
+              </div>
+              <div style={{ fontSize: 12, color: '#4b5563' }}>
+                Active hotspots: <strong>{activeHotspots.length}</strong>
+              </div>
+            </div>
+          )}
 
           {['A', 'B', 'C', 'D', 'E', 'F'].map((los) => {
             const count = stats.losCounts[los] || 0;
@@ -697,8 +1366,36 @@ const MobileTrafficOverlay: React.FC<{
               </div>
             );
           })}
+
+          {activeHotspots.length > 0 && (
+            <>
+              <div style={{ borderTop: '1px solid #e5e7eb', margin: '10px 0' }} />
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Hotspots in view</div>
+              {activeHotspots.slice(0, 4).map((hotspot) => (
+                <div
+                  key={hotspot.id}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: 10,
+                    background: '#fff7ed',
+                    border: '1px solid #fed7aa',
+                    marginBottom: 8,
+                  }}
+                >
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#9a3412', marginBottom: 2 }}>
+                    {hotspot.name}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#7c2d12' }}>
+                    Severity {hotspot.realtime?.severity || 0} · Speed {(100 * (hotspot.realtime?.speed_ratio || 1)).toFixed(0)}%
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       )}
     </>
   );
 };
+
+export default TrafficOverlay;
