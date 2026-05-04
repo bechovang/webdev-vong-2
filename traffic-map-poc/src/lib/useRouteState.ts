@@ -2,14 +2,15 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import {
+  AlternativeRouteResponse,
   Coordinate,
   DepartureRecommendation,
   DepartureRecommendationResponse,
   DepartureOffsetMinutes,
   PickingMode,
-  PredictionAnalysis,
+  RankedRoute,
   RouteData,
-  RouteResponse,
+  PredictionAnalysis,
 } from './routing';
 
 interface UseRouteStateResult {
@@ -18,6 +19,8 @@ interface UseRouteStateResult {
   route: RouteData | null;
   predictionAnalysis: PredictionAnalysis | null;
   departureRecommendation: DepartureRecommendation | null;
+  alternativeRoutes: RankedRoute[];
+  selectedRouteId: string | null;
   pickingMode: PickingMode;
   routeLoading: boolean;
   recommendationLoading: boolean;
@@ -28,18 +31,27 @@ interface UseRouteStateResult {
   setPoint: (mode: Exclude<PickingMode, null>, coordinate: Coordinate) => void;
   requestRoute: (params: { departureOffsetMinutes: DepartureOffsetMinutes; targetHour?: number; targetWeekday?: number }) => Promise<void>;
   clearRoute: () => void;
+  selectRoute: (id: string) => void;
 }
 
 export function useRouteState(): UseRouteStateResult {
   const [origin, setOrigin] = useState<Coordinate | null>(null);
   const [destination, setDestination] = useState<Coordinate | null>(null);
-  const [route, setRoute] = useState<RouteData | null>(null);
-  const [predictionAnalysis, setPredictionAnalysis] = useState<PredictionAnalysis | null>(null);
+  const [alternativeRoutes, setAlternativeRoutes] = useState<RankedRoute[]>([]);
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
   const [departureRecommendation, setDepartureRecommendation] = useState<DepartureRecommendation | null>(null);
   const [pickingMode, setPickingMode] = useState<PickingMode>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
+
+  const selectedRoute = useMemo<RankedRoute | null>(() => {
+    if (!selectedRouteId || alternativeRoutes.length === 0) return null;
+    return alternativeRoutes.find((r) => r.id === selectedRouteId) ?? alternativeRoutes[0] ?? null;
+  }, [alternativeRoutes, selectedRouteId]);
+
+  const route = useMemo<RouteData | null>(() => selectedRoute?.route ?? null, [selectedRoute]);
+  const predictionAnalysis = useMemo<PredictionAnalysis | null>(() => selectedRoute?.analysis ?? null, [selectedRoute]);
 
   const beginPicking = useCallback((mode: Exclude<PickingMode, null>) => {
     setPickingMode(mode);
@@ -58,8 +70,8 @@ export function useRouteState(): UseRouteStateResult {
     }
 
     setPickingMode(null);
-    setRoute(null);
-    setPredictionAnalysis(null);
+    setAlternativeRoutes([]);
+    setSelectedRouteId(null);
     setDepartureRecommendation(null);
     setRouteError(null);
   }, []);
@@ -67,8 +79,8 @@ export function useRouteState(): UseRouteStateResult {
   const clearRoute = useCallback(() => {
     setOrigin(null);
     setDestination(null);
-    setRoute(null);
-    setPredictionAnalysis(null);
+    setAlternativeRoutes([]);
+    setSelectedRouteId(null);
     setDepartureRecommendation(null);
     setPickingMode(null);
     setRouteLoading(false);
@@ -76,7 +88,7 @@ export function useRouteState(): UseRouteStateResult {
     setRouteError(null);
   }, []);
 
-  const requestDepartureRecommendation = useCallback(async () => {
+  const requestDepartureRecommendation = useCallback(async (routeData: RouteData) => {
     if (!origin || !destination) {
       return;
     }
@@ -123,9 +135,11 @@ export function useRouteState(): UseRouteStateResult {
     setDepartureRecommendation(null);
     setRecommendationLoading(false);
     setRouteError(null);
+    setAlternativeRoutes([]);
+    setSelectedRouteId(null);
 
     try {
-      const response = await fetch('/api/route', {
+      const response = await fetch('/api/route/alternatives', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -138,27 +152,40 @@ export function useRouteState(): UseRouteStateResult {
           targetHour: params.targetHour,
           targetWeekday: params.targetWeekday,
           includeSteps: true,
-          includePredictionAnalysis: true,
+          alternativeRoute: {
+            enabled: true,
+            maxPaths: 3,
+            maxWeightFactor: 1.4,
+            maxShareFactor: 0.6,
+          },
         }),
       });
 
-      const data = (await response.json()) as RouteResponse;
+      const data = (await response.json()) as AlternativeRouteResponse;
       if (!response.ok || data.status !== 'success') {
         throw new Error(('error' in data ? data.error?.message : null) || 'Failed to build route');
       }
 
-      setRoute(data.data.route);
-      setPredictionAnalysis(data.data.predictionAnalysis || null);
-      void requestDepartureRecommendation();
+      const routes = data.data.routes;
+      setAlternativeRoutes(routes);
+      setSelectedRouteId(data.data.recommendedRouteId || routes[0]?.id || null);
+
+      if (routes.length > 0) {
+        void requestDepartureRecommendation(routes[0].route);
+      }
     } catch (error) {
-      setRoute(null);
-      setPredictionAnalysis(null);
+      setAlternativeRoutes([]);
+      setSelectedRouteId(null);
       setDepartureRecommendation(null);
       setRouteError(error instanceof Error ? error.message : 'Failed to build route');
     } finally {
       setRouteLoading(false);
     }
   }, [destination, origin, requestDepartureRecommendation]);
+
+  const selectRoute = useCallback((id: string) => {
+    setSelectedRouteId(id);
+  }, []);
 
   const canRequestRoute = useMemo(() => {
     return Boolean(origin && destination && !routeLoading);
@@ -170,6 +197,8 @@ export function useRouteState(): UseRouteStateResult {
     route,
     predictionAnalysis,
     departureRecommendation,
+    alternativeRoutes,
+    selectedRouteId,
     pickingMode,
     routeLoading,
     recommendationLoading,
@@ -180,5 +209,6 @@ export function useRouteState(): UseRouteStateResult {
     setPoint,
     requestRoute,
     clearRoute,
+    selectRoute,
   };
 }

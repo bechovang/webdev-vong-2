@@ -39,12 +39,15 @@ export default function Home() {
     route,
     predictionAnalysis,
     departureRecommendation,
+    alternativeRoutes,
+    selectedRouteId,
     routeLoading,
     recommendationLoading,
     routeError,
     setPoint,
     requestRoute,
     clearRoute,
+    selectRoute,
   } = useRouteState();
 
   useMapPicking({
@@ -392,6 +395,9 @@ export default function Home() {
           destination={destination}
           route={route}
           predictionAnalysis={predictionAnalysis}
+          alternativeRoutes={alternativeRoutes}
+          selectedRouteId={selectedRouteId}
+          onSelectRoute={selectRoute}
         />
       )}
 
@@ -405,6 +411,9 @@ export default function Home() {
           recommendationLoading={recommendationLoading}
           routeError={routeError}
           pickingMode={null}
+          alternativeRoutes={alternativeRoutes}
+          selectedRouteId={selectedRouteId}
+          onSelectRoute={selectRoute}
         />
       )}
     </main>
