@@ -77,6 +77,37 @@ export interface RouteRequest {
   includePredictionAnalysis?: boolean;
 }
 
+export interface AlternativeRouteOptions {
+  enabled?: boolean;
+  maxPaths?: number;
+  maxWeightFactor?: number;
+  maxShareFactor?: number;
+}
+
+export interface RouteScore {
+  baseDurationSeconds: number;
+  predictedDelaySeconds: number;
+  predictedDurationSeconds: number;
+  congestionScore: number;
+  riskPenaltySeconds: number;
+  coveragePenaltySeconds: number;
+  finalCostSeconds: number;
+}
+
+export interface RankedRoute {
+  id: string;
+  rank: number;
+  label: 'recommended' | 'fastest' | 'least_congested' | 'alternative';
+  route: RouteData;
+  analysis: PredictionAnalysis;
+  score: RouteScore;
+  reason: string;
+}
+
+export interface AlternativeRouteRequest extends RouteRequest {
+  alternativeRoute?: AlternativeRouteOptions;
+}
+
 export interface ApiError {
   code: 'invalid_input' | 'provider_error' | 'no_route' | 'timeout' | 'unknown';
   message: string;
@@ -90,12 +121,24 @@ export interface RouteResponseSuccess {
   };
 }
 
+export interface AlternativeRouteResponseSuccess {
+  status: 'success';
+  data: {
+    recommendedRouteId: string;
+    routes: RankedRoute[];
+  };
+}
+
 export interface RouteResponseError {
   status: 'error';
   error: ApiError;
 }
 
 export type RouteResponse = RouteResponseSuccess | RouteResponseError;
+
+export type AlternativeRouteResponse =
+  | AlternativeRouteResponseSuccess
+  | RouteResponseError;
 
 export interface DepartureRecommendationRequest {
   origin: Coordinate;

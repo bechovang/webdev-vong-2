@@ -1,5 +1,6 @@
 import {
   ApiError,
+  AlternativeRouteOptions,
   Coordinate,
   RouteData,
   RouteProfile,
@@ -92,6 +93,38 @@ export async function getGraphHopperRoute(params: {
   };
 }
 
+export async function getGraphHopperAlternativeRoutes(params: {
+  origin: Coordinate;
+  destination: Coordinate;
+  profile: RouteProfile;
+  includeSteps: boolean;
+  alternativeRoute?: AlternativeRouteOptions;
+}): Promise<RouteData[]> {
+  const apiKey = process.env.GRAPHHOPPER_API_KEY;
+  if (!apiKey) {
+    throw new RouteApiError('provider_error', 'Missing GRAPHHOPPER_API_KEY on the server.');
+  }
+
+  const payload = await fetchGraphHopperRoute({
+    origin: params.origin,
+    destination: params.destination,
+    profile: params.profile,
+    includeSteps: params.includeSteps,
+    apiKey,
+    alternativeRoute: params.alternativeRoute,
+  });
+
+  const routes = (payload.paths || [])
+    .map((path) => normalizeGraphHopperPath(path, params.profile, params.includeSteps))
+    .filter((route): route is RouteData => route !== null);
+
+  if (routes.length === 0) {
+    throw new RouteApiError('no_route', 'GraphHopper did not return a usable route.');
+  }
+
+  return routes;
+}
+
 function buildGraphHopperUrl(params: {
   origin: Coordinate;
   destination: Coordinate;
@@ -110,6 +143,73 @@ function buildGraphHopperUrl(params: {
   searchParams.set('key', params.apiKey);
 
   return `${GRAPH_HOPPER_BASE_URL}?${searchParams.toString()}`;
+}
+
+async function fetchGraphHopperRoute(params: {
+  origin: Coordinate;
+  destination: Coordinate;
+  profile: RouteProfile;
+  includeSteps: boolean;
+  apiKey: string;
+  alternativeRoute?: AlternativeRouteOptions;
+}) {
+  const useAlternatives = params.alternativeRoute?.enabled === true;
+  const url = useAlternatives
+    ? `${GRAPH_HOPPER_BASE_URL}?key=${encodeURIComponent(params.apiKey)}`
+    : buildGraphHopperUrl({
+        origin: params.origin,
+        destination: params.destination,
+        profile: params.profile,
+        includeSteps: params.includeSteps,
+        apiKey: params.apiKey,
+      });
+
+  const response = await fetch(url, {
+    method: useAlternatives ? 'POST' : 'GET',
+    cache: 'no-store',
+    headers: {
+      Accept: 'application/json',
+      ...(useAlternatives ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: useAlternatives
+      ? JSON.stringify(buildAlternativeRouteRequestBody(params))
+      : undefined,
+  });
+
+  const payload = (await response.json()) as GraphHopperResponse;
+  if (!response.ok) {
+    throw mapGraphHopperError(response.status, payload);
+  }
+
+  return payload;
+}
+
+function buildAlternativeRouteRequestBody(params: {
+  origin: Coordinate;
+  destination: Coordinate;
+  profile: RouteProfile;
+  includeSteps: boolean;
+  alternativeRoute?: AlternativeRouteOptions;
+}) {
+  return {
+    profile: GRAPH_HOPPER_PROFILES[params.profile],
+    points: [
+      [params.origin[0], params.origin[1]],
+      [params.destination[0], params.destination[1]],
+    ],
+    instructions: params.includeSteps,
+    points_encoded: false,
+    snap_preventions: ['ferry'],
+    algorithm: 'alternative_route',
+    'alternative_route.max_paths': clampAlternativeMaxPaths(params.alternativeRoute?.maxPaths),
+    'alternative_route.max_weight_factor': params.alternativeRoute?.maxWeightFactor ?? 1.4,
+    'alternative_route.max_share_factor': params.alternativeRoute?.maxShareFactor ?? 0.6,
+  };
+}
+
+function clampAlternativeMaxPaths(value?: number) {
+  if (value == null || Number.isNaN(value)) return 3;
+  return Math.max(1, Math.min(3, Math.round(value)));
 }
 
 function mapGraphHopperError(status: number, payload: GraphHopperResponse) {
@@ -132,6 +232,26 @@ function mapGraphHopperError(status: number, payload: GraphHopperResponse) {
 function normalizeBbox(bbox: [number, number, number, number]): [number, number, number, number] {
   // GraphHopper returns [minLon, minLat, maxLon, maxLat] — already the correct order
   return bbox;
+}
+
+function normalizeGraphHopperPath(
+  path: GraphHopperPath,
+  profile: RouteProfile,
+  includeSteps: boolean,
+): RouteData | null {
+  if (!path.points || path.distance == null || path.time == null || !path.bbox) {
+    return null;
+  }
+
+  return {
+    provider: 'graphhopper',
+    profile,
+    distanceMeters: Math.round(path.distance),
+    durationSeconds: Math.round(path.time / 1000),
+    geometry: path.points,
+    bbox: normalizeBbox(path.bbox),
+    steps: includeSteps ? normalizeInstructions(path.instructions) : undefined,
+  };
 }
 
 function normalizeInstructions(instructions: GraphHopperInstruction[] | undefined): RouteStep[] {
