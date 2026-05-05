@@ -230,7 +230,6 @@ function mapGraphHopperError(status: number, payload: GraphHopperResponse) {
 }
 
 function normalizeBbox(bbox: [number, number, number, number]): [number, number, number, number] {
-  // GraphHopper returns [minLon, minLat, maxLon, maxLat] — already the correct order
   return bbox;
 }
 

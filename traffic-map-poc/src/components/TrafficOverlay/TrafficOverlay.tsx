@@ -60,7 +60,7 @@ export interface TrafficSegment {
   };
 }
 
-type TrafficHotspot = {
+export type TrafficHotspot = {
   id: string;
   name: string;
   lat: number;
@@ -84,6 +84,7 @@ interface TrafficOverlayProps {
   map: maplibregl.Map | null;
   segments: TrafficSegment[];
   timeSelection: TimeSelection;
+  hotspots?: TrafficHotspot[];
 }
 
 type SegmentFeatureProperties = {
@@ -117,12 +118,15 @@ export const TrafficOverlay: React.FC<TrafficOverlayProps> = ({
   map,
   segments,
   timeSelection,
+  hotspots: hotspotInput = [],
 }) => {
   const segmentPopupRef = useRef<maplibregl.Popup | null>(null);
   const hotspotPopupRef = useRef<maplibregl.Popup | null>(null);
   const hoveredSegmentIdRef = useRef<number | null>(null);
+  const hoverFrameRef = useRef<number | null>(null);
+  const hotspotHoverFrameRef = useRef<number | null>(null);
   const { getCachedPrediction } = useTrafficPredictionCache();
-  const [hotspots, setHotspots] = useState<TrafficHotspot[]>([]);
+  const hotspots = hotspotInput.length > 0 ? hotspotInput : getFallbackHotspots();
 
   const segmentsWithLOS = useMemo(() => {
     const hasAPILos = segments.length > 0 && segments.some((segment) => segment.los !== undefined);
@@ -169,40 +173,6 @@ export const TrafficOverlay: React.FC<TrafficOverlayProps> = ({
   );
 
   useEffect(() => {
-    let cancelled = false;
-
-    const loadHotspots = async () => {
-      try {
-        const response = await fetch('/api/hotspots', { cache: 'no-store' });
-        if (!response.ok) {
-          throw new Error(`Hotspots request failed: ${response.status}`);
-        }
-
-        const data = await response.json();
-        if (!cancelled) {
-          const apiHotspots = Array.isArray(data.hotspots) ? data.hotspots : [];
-          setHotspots(apiHotspots.length > 0 ? apiHotspots : getFallbackHotspots());
-        }
-      } catch (error) {
-        console.error('Failed to load hotspots:', error);
-        if (!cancelled) {
-          setHotspots(getFallbackHotspots());
-        }
-      }
-    };
-
-    void loadHotspots();
-    const timer = window.setInterval(() => {
-      void loadHotspots();
-    }, 90000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, []);
-
-  useEffect(() => {
     if (!map) return;
 
     if (!segmentPopupRef.current) {
@@ -223,15 +193,8 @@ export const TrafficOverlay: React.FC<TrafficOverlayProps> = ({
       });
     }
 
-    const onMouseMove = (event: maplibregl.MapMouseEvent) => {
-      if (!map.getLayer(LAYER_ID)) {
-        hoveredSegmentIdRef.current = null;
-        segmentPopupRef.current?.remove();
-        map.getCanvas().style.cursor = '';
-        return;
-      }
-
-      if (map.getZoom() < 15) {
+    const runSegmentHover = (event: maplibregl.MapMouseEvent) => {
+      if (!map.getLayer(LAYER_ID) || map.getZoom() < 15) {
         hoveredSegmentIdRef.current = null;
         segmentPopupRef.current?.remove();
         map.getCanvas().style.cursor = '';
@@ -269,6 +232,16 @@ export const TrafficOverlay: React.FC<TrafficOverlayProps> = ({
       }
     };
 
+    const onMouseMove = (event: maplibregl.MapMouseEvent) => {
+      if (hoverFrameRef.current != null) {
+        cancelAnimationFrame(hoverFrameRef.current);
+      }
+      hoverFrameRef.current = requestAnimationFrame(() => {
+        hoverFrameRef.current = null;
+        runSegmentHover(event);
+      });
+    };
+
     const onMouseLeave = () => {
       hoveredSegmentIdRef.current = null;
       segmentPopupRef.current?.remove();
@@ -281,6 +254,10 @@ export const TrafficOverlay: React.FC<TrafficOverlayProps> = ({
     return () => {
       map.off('mousemove', onMouseMove);
       map.off('mouseout', onMouseLeave);
+      if (hoverFrameRef.current != null) {
+        cancelAnimationFrame(hoverFrameRef.current);
+        hoverFrameRef.current = null;
+      }
       segmentPopupRef.current?.remove();
       hotspotPopupRef.current?.remove();
     };
@@ -630,7 +607,7 @@ export const TrafficOverlay: React.FC<TrafficOverlayProps> = ({
       showHotspotPopup(feature);
     };
 
-    const onHotspotMove = (event: maplibregl.MapMouseEvent) => {
+    const runHotspotMove = (event: maplibregl.MapMouseEvent) => {
       const interactiveLayerIds = getInteractiveHotspotLayerIds();
       if (interactiveLayerIds.length === 0) {
         map.getCanvas().style.cursor = '';
@@ -642,6 +619,16 @@ export const TrafficOverlay: React.FC<TrafficOverlayProps> = ({
       }).length > 0;
 
       map.getCanvas().style.cursor = hasHotspot ? 'pointer' : '';
+    };
+
+    const onHotspotMove = (event: maplibregl.MapMouseEvent) => {
+      if (hotspotHoverFrameRef.current != null) {
+        cancelAnimationFrame(hotspotHoverFrameRef.current);
+      }
+      hotspotHoverFrameRef.current = requestAnimationFrame(() => {
+        hotspotHoverFrameRef.current = null;
+        runHotspotMove(event);
+      });
     };
 
     const onHotspotMouseOut = () => {
@@ -663,6 +650,10 @@ export const TrafficOverlay: React.FC<TrafficOverlayProps> = ({
       map.off('mousemove', onHotspotMove);
       map.off('mouseout', onHotspotMouseOut);
       map.off('load', applyHotspots);
+      if (hotspotHoverFrameRef.current != null) {
+        cancelAnimationFrame(hotspotHoverFrameRef.current);
+        hotspotHoverFrameRef.current = null;
+      }
     };
   }, [hotspotGeoJsonData, hotspotRadiusGeoJsonData, map]);
 

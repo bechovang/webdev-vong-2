@@ -1,17 +1,41 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import MapView from '@/components/Map';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import RouteLayer from '@/components/RouteLayer';
 import RouteSummaryPanel from '@/components/RouteSummaryPanel';
 import { SearchBox, SearchLocationMarker } from '@/components/SearchBox';
-import type { LonLat, RoutePoint } from '@/components/SearchBox';
+import type { ChatRouteCommand, LonLat, RoutePoint } from '@/components/SearchBox';
 import HotspotInspector from '@/components/HotspotInspector';
 import TrafficOverlay from '@/components/TrafficOverlay';
+import type { TrafficHotspot } from '@/components/TrafficOverlay';
 import TimePicker, { TimeSelection } from '@/components/TimePicker';
+import SmartRouteChat from '@/components/Chat/SmartRouteChat';
+import { buildChatContext } from '@/lib/chat/buildChatContext';
+import type { ChatAction } from '@/lib/chat/types';
 import { useMapPicking, useRouteState, useTrafficSegments } from '@/lib';
+
+interface HotspotStatus {
+  id: string;
+  name: string;
+  severity: number;
+  status: 'live' | 'cached' | 'stale' | 'error' | 'mock';
+}
+
+interface ChatHotspotSummary {
+  activeHotspots: number;
+  highSeverityHotspots: number;
+  statuses: HotspotStatus[];
+}
+
+interface HotspotState {
+  hotspots: TrafficHotspot[];
+  loading: boolean;
+  error: string | null;
+  realtimeEnabled: boolean | null;
+}
 
 export default function Home() {
   const [map, setMap] = useState<maplibregl.Map | null>(null);
@@ -22,6 +46,14 @@ export default function Home() {
   const [searchLocation, setSearchLocation] = useState<{ coords: LonLat; label: string } | null>(null);
   const [routeDestination, setRouteDestination] = useState<RoutePoint | null>(null);
   const [pendingRouteRequest, setPendingRouteRequest] = useState(false);
+  const [chatRouteCommand, setChatRouteCommand] = useState<ChatRouteCommand | null>(null);
+  const [hotspotSummary, setHotspotSummary] = useState<ChatHotspotSummary | undefined>(undefined);
+  const [hotspotState, setHotspotState] = useState<HotspotState>({
+    hotspots: [],
+    loading: true,
+    error: null,
+    realtimeEnabled: null,
+  });
   const mapInitialized = useRef(false);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const viewportSetupRef = useRef(false);
@@ -175,6 +207,125 @@ export default function Home() {
     targetWeekday,
   ]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadHotspots = async () => {
+      try {
+        setHotspotState((prev) => ({ ...prev, loading: true, error: null }));
+        const response = await fetch('/api/hotspots', { cache: 'no-store' });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data?.message || data?.error || `HTTP ${response.status}`);
+        }
+        if (cancelled) return;
+
+        const hotspots = Array.isArray(data?.hotspots) ? data.hotspots as TrafficHotspot[] : [];
+        const statuses: HotspotStatus[] = hotspots.map((hotspot: Record<string, unknown>) => {
+          const realtime = hotspot.realtime as Record<string, unknown> | undefined;
+          const rawSeverity = realtime?.severity;
+          const severity = typeof rawSeverity === 'number' ? rawSeverity : 0;
+          const realtimeStatus = hotspot.realtime_status;
+
+          return {
+            id: String(hotspot.id || ''),
+            name: String(hotspot.name || 'Hotspot'),
+            severity,
+            status:
+              realtimeStatus === 'ok'
+                ? 'live'
+                : realtimeStatus === 'error'
+                  ? 'error'
+                  : realtimeStatus === 'disabled'
+                    ? 'mock'
+                    : 'cached',
+          };
+        });
+
+        setHotspotSummary({
+          activeHotspots: statuses.length,
+          highSeverityHotspots: statuses.filter((status) => status.severity >= 0.7).length,
+          statuses,
+        });
+        setHotspotState({
+          hotspots,
+          loading: false,
+          error: null,
+          realtimeEnabled: typeof data?.realtime_enabled === 'boolean' ? data.realtime_enabled : null,
+        });
+      } catch {
+        if (!cancelled) {
+          setHotspotSummary(undefined);
+          setHotspotState((prev) => ({
+            hotspots: prev.hotspots,
+            loading: false,
+            error: 'Failed to load hotspots',
+            realtimeEnabled: false,
+          }));
+        }
+      }
+    };
+
+    void loadHotspots();
+    const timer = window.setInterval(() => {
+      void loadHotspots();
+    }, 30000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const chatContext = useMemo(
+    () =>
+      buildChatContext({
+        origin,
+        destination,
+        selectedRouteId,
+        selectedRoute: route,
+        predictionAnalysis,
+        alternativeRoutes,
+        departureRecommendation,
+        timeSelection,
+        segments,
+        hotspotSummary,
+      }),
+    [origin, destination, selectedRouteId, route, predictionAnalysis, alternativeRoutes, departureRecommendation, timeSelection, segments, hotspotSummary],
+  );
+
+  const handleChatAction = useCallback(
+    (action: ChatAction) => {
+      switch (action.type) {
+        case 'select_route':
+          selectRoute(action.routeId);
+          break;
+        case 'set_departure_offset': {
+          const offset = action.offsetMinutes;
+          const horizon =
+            offset === 0 ? 'now' : offset === 15 ? '+15' : offset === 30 ? '+30' : '+60';
+          setTimeSelection({ type: 'preset', horizon });
+          break;
+        }
+        case 'open_route_panel':
+          setChatRouteCommand({ id: Date.now(), type: 'open_route_panel' });
+          break;
+        case 'show_congested_segments':
+          focusCongestedSegments(mapRef.current, predictionAnalysis?.congestedSegments);
+          break;
+        case 'fill_route':
+          setChatRouteCommand({
+            id: Date.now(),
+            type: 'fill_route',
+            originQuery: action.originQuery,
+            destinationQuery: action.destinationQuery,
+          });
+          break;
+      }
+    },
+    [predictionAnalysis?.congestedSegments, selectRoute],
+  );
+
   return (
     <main style={{ width: '100vw', height: '100vh', overflow: 'hidden' }}>
       <div
@@ -274,6 +425,7 @@ export default function Home() {
               clearRoute();
             }}
             routeLoading={routeLoading}
+            chatCommand={chatRouteCommand}
           />
         </div>
       )}
@@ -369,10 +521,23 @@ export default function Home() {
       <MapView onMapLoad={handleMapLoad} />
 
       {map && (
-        <TrafficOverlay map={map} segments={segments} timeSelection={timeSelection} />
+        <TrafficOverlay
+          map={map}
+          segments={segments}
+          timeSelection={timeSelection}
+          hotspots={hotspotState.hotspots}
+        />
       )}
 
-      {map && <HotspotInspector map={map} />}
+      {map && (
+        <HotspotInspector
+          map={map}
+          hotspots={hotspotState.hotspots}
+          loading={hotspotState.loading}
+          error={hotspotState.error}
+          realtimeEnabled={hotspotState.realtimeEnabled}
+        />
+      )}
 
       {map && searchLocation && (
         <SearchLocationMarker
@@ -416,6 +581,10 @@ export default function Home() {
           onSelectRoute={selectRoute}
         />
       )}
+
+      {!error && (
+        <SmartRouteChat context={chatContext} onAction={handleChatAction} />
+      )}
     </main>
   );
 }
@@ -433,4 +602,37 @@ function getNearestDepartureOffsetMinutes(customTime?: Date) {
       ? candidate
       : closest;
   }, 0 as (typeof supportedOffsets)[number]);
+}
+
+function focusCongestedSegments(
+  map: maplibregl.Map | null,
+  congestedSegments?: Array<{ geometry?: GeoJSON.LineString }>,
+) {
+  if (!map || !congestedSegments?.length) {
+    return;
+  }
+
+  const points = congestedSegments.flatMap((segment) => segment.geometry?.coordinates ?? []);
+  if (points.length === 0) {
+    return;
+  }
+
+  const bounds = points.reduce(
+    (acc, [lng, lat]) => {
+      acc[0] = Math.min(acc[0], lng);
+      acc[1] = Math.min(acc[1], lat);
+      acc[2] = Math.max(acc[2], lng);
+      acc[3] = Math.max(acc[3], lat);
+      return acc;
+    },
+    [Infinity, Infinity, -Infinity, -Infinity] as [number, number, number, number],
+  );
+
+  map.fitBounds(
+    [
+      [bounds[0], bounds[1]],
+      [bounds[2], bounds[3]],
+    ],
+    { padding: 100, duration: 900 },
+  );
 }

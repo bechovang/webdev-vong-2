@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import maplibregl from 'maplibre-gl';
+import type { TrafficHotspot } from '@/components/TrafficOverlay';
 
 type HotspotRealtimeInfo = {
   severity?: number;
@@ -10,72 +11,23 @@ type HotspotRealtimeInfo = {
   road_closure: boolean;
 };
 
-type TrafficHotspot = {
-  id: string;
-  name: string;
-  lat: number;
-  lng: number;
-  radius_meters: number;
-  description?: string;
-  realtime?: HotspotRealtimeInfo | null;
-  realtime_status?: 'ok' | 'disabled' | 'error';
-  realtime_message?: string;
-};
-
 interface HotspotInspectorProps {
   map: maplibregl.Map | null;
+  hotspots?: TrafficHotspot[];
+  loading?: boolean;
+  error?: string | null;
+  realtimeEnabled?: boolean | null;
 }
 
-export const HotspotInspector: React.FC<HotspotInspectorProps> = ({ map }) => {
+export const HotspotInspector: React.FC<HotspotInspectorProps> = ({
+  map,
+  hotspots: hotspotInput = [],
+  loading = false,
+  error = null,
+  realtimeEnabled = null,
+}) => {
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [hotspots, setHotspots] = useState<TrafficHotspot[]>([]);
-  const [realtimeEnabled, setRealtimeEnabled] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const response = await fetch('/api/hotspots', { cache: 'no-store' });
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data?.message || data?.error || `HTTP ${response.status}`);
-        }
-
-        if (!cancelled) {
-          const apiHotspots = Array.isArray(data.hotspots) ? data.hotspots : [];
-          setHotspots(apiHotspots.length > 0 ? apiHotspots : getFallbackHotspots());
-          setRealtimeEnabled(typeof data.realtime_enabled === 'boolean' ? data.realtime_enabled : null);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : String(err));
-          setHotspots(getFallbackHotspots());
-          setRealtimeEnabled(false);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    void load();
-    const timer = window.setInterval(() => {
-      void load();
-    }, 30000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, []);
+  const hotspots = hotspotInput.length > 0 ? hotspotInput : getFallbackHotspots();
 
   return (
     <div style={styles.wrapper}>
