@@ -392,41 +392,52 @@ export default function Home() {
       {!error && (
         <div style={{
           position: 'absolute', top: 70, left: '50%', transform: 'translateX(-50%)', zIndex: 2100,
-          width: 'min(560px, calc(100vw - 32px))',
+          width: 'min(620px, calc(100vw - 32px))',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
         }}>
-          <SearchBox
-            mapCenter={mapCenter}
-            onSelect={(coords, label) => {
-              setSearchLocation({ coords, label });
-              mapRef.current?.flyTo({ center: coords, zoom: 15, duration: 1000 });
-            }}
-            onRoute={(origin, dest) => {
-              setPoint('origin', origin.coords);
-              setPoint('destination', dest.coords);
-              setRouteDestination(null);
-              setPendingRouteRequest(true);
-              mapRef.current?.fitBounds(
-                [
-                  [Math.min(origin.coords[0], dest.coords[0]) - 0.005, Math.min(origin.coords[1], dest.coords[1]) - 0.005],
-                  [Math.max(origin.coords[0], dest.coords[0]) + 0.005, Math.max(origin.coords[1], dest.coords[1]) + 0.005],
-                ],
-                { padding: 80, duration: 800 }
-              );
-            }}
-            routeDestination={routeDestination}
-            onCancelRoute={() => {
-              setPendingRouteRequest(false);
-              setRouteDestination(null);
-              clearRoute();
-            }}
-            onClearRoute={() => {
-              setPendingRouteRequest(false);
-              setRouteDestination(null);
-              clearRoute();
-            }}
-            routeLoading={routeLoading}
-            chatCommand={chatRouteCommand}
-          />
+          <div style={{ flex: '1 1 560px', maxWidth: 560, minWidth: 0 }}>
+            <SearchBox
+              mapCenter={mapCenter}
+              onSelect={(coords, label) => {
+                setSearchLocation({ coords, label });
+                mapRef.current?.flyTo({ center: coords, zoom: 15, duration: 1000 });
+              }}
+              onRoute={(origin, dest) => {
+                setPoint('origin', origin.coords);
+                setPoint('destination', dest.coords);
+                setRouteDestination(null);
+                setPendingRouteRequest(true);
+                mapRef.current?.fitBounds(
+                  [
+                    [Math.min(origin.coords[0], dest.coords[0]) - 0.005, Math.min(origin.coords[1], dest.coords[1]) - 0.005],
+                    [Math.max(origin.coords[0], dest.coords[0]) + 0.005, Math.max(origin.coords[1], dest.coords[1]) + 0.005],
+                  ],
+                  { padding: 80, duration: 800 }
+                );
+              }}
+              routeDestination={routeDestination}
+              onCancelRoute={() => {
+                setPendingRouteRequest(false);
+                setRouteDestination(null);
+                clearRoute();
+              }}
+              onClearRoute={() => {
+                setPendingRouteRequest(false);
+                setRouteDestination(null);
+                clearRoute();
+              }}
+              routeLoading={routeLoading}
+              chatCommand={chatRouteCommand}
+            />
+          </div>
+          {!isMobile && (
+            <div style={{ position: 'relative', flex: '0 0 auto' }}>
+              <SmartRouteChat context={chatContext} onAction={handleChatAction} inline />
+            </div>
+          )}
         </div>
       )}
 
@@ -582,7 +593,7 @@ export default function Home() {
         />
       )}
 
-      {!error && (
+      {!error && isMobile && (
         <SmartRouteChat context={chatContext} onAction={handleChatAction} />
       )}
     </main>

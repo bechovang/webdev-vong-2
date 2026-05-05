@@ -8,9 +8,10 @@ import SuggestedPrompts from './SuggestedPrompts';
 interface SmartRouteChatProps {
   context: ChatClientContext;
   onAction?: (action: ChatAction) => void;
+  inline?: boolean;
 }
 
-export const SmartRouteChat: React.FC<SmartRouteChatProps> = ({ context, onAction }) => {
+export const SmartRouteChat: React.FC<SmartRouteChatProps> = ({ context, onAction, inline = false }) => {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [input, setInput] = useState('');
@@ -56,7 +57,7 @@ export const SmartRouteChat: React.FC<SmartRouteChatProps> = ({ context, onActio
       } catch {
         setMessages((prev) => [
           ...prev,
-          { role: 'assistant', content: 'Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại.' },
+          { role: 'assistant', content: 'Xin loi, da co loi xay ra. Vui long thu lai.' },
         ]);
       } finally {
         setLoading(false);
@@ -70,42 +71,93 @@ export const SmartRouteChat: React.FC<SmartRouteChatProps> = ({ context, onActio
     void sendMessage(input);
   };
 
+  const triggerStyle: React.CSSProperties = inline
+    ? {
+        position: 'relative',
+        zIndex: 1300,
+        width: 48,
+        height: 48,
+        borderRadius: '50%',
+        background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+        color: 'white',
+        border: 'none',
+        boxShadow: '0 4px 16px rgba(109, 40, 217, 0.4)',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 20,
+        transition: 'transform 0.15s',
+      }
+    : {
+        position: 'absolute',
+        bottom: 20,
+        left: 16,
+        zIndex: 1300,
+        width: 52,
+        height: 52,
+        borderRadius: '50%',
+        background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+        color: 'white',
+        border: 'none',
+        boxShadow: '0 4px 16px rgba(109, 40, 217, 0.4)',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 22,
+        transition: 'transform 0.15s',
+      };
+
+  const panelStyle: React.CSSProperties = inline
+    ? {
+        position: 'absolute',
+        top: 58,
+        right: 0,
+        zIndex: 1300,
+        width: 'min(380px, calc(100vw - 32px))',
+        height: 'min(420px, calc(100vh - 180px))',
+        background: 'white',
+        borderRadius: 16,
+        boxShadow: '0 10px 40px rgba(15, 23, 42, 0.2)',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }
+    : {
+        position: 'absolute',
+        bottom: 20,
+        left: 16,
+        zIndex: 1300,
+        width: 'min(380px, calc(100vw - 32px))',
+        height: 'min(520px, calc(100vh - 120px))',
+        background: 'white',
+        borderRadius: 16,
+        boxShadow: '0 10px 40px rgba(15, 23, 42, 0.2)',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      };
+
   return (
     <>
       {!open && (
         <button
           type="button"
           onClick={() => setOpen(true)}
-          style={{
-            position: 'absolute',
-            bottom: 20,
-            left: 16,
-            zIndex: 1300,
-            width: 52,
-            height: 52,
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
-            color: 'white',
-            border: 'none',
-            boxShadow: '0 4px 16px rgba(109, 40, 217, 0.4)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 22,
-            transition: 'transform 0.15s',
-          }}
+          style={triggerStyle}
           onMouseEnter={(e) => {
             (e.currentTarget as HTMLElement).style.transform = 'scale(1.08)';
           }}
           onMouseLeave={(e) => {
             (e.currentTarget as HTMLElement).style.transform = 'scale(1)';
           }}
-          aria-label="Mở SmartRoute Chat"
+          aria-label="Open SmartRoute Chat"
+          title="SmartRoute Assistant"
         >
           <svg
-            width="24"
-            height="24"
+            width="22"
+            height="22"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -119,22 +171,7 @@ export const SmartRouteChat: React.FC<SmartRouteChatProps> = ({ context, onActio
       )}
 
       {open && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: 20,
-            left: 16,
-            zIndex: 1300,
-            width: 'min(380px, calc(100vw - 32px))',
-            height: 'min(520px, calc(100vh - 120px))',
-            background: 'white',
-            borderRadius: 16,
-            boxShadow: '0 10px 40px rgba(15, 23, 42, 0.2)',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-          }}
-        >
+        <div style={panelStyle}>
           <div
             style={{
               padding: '12px 16px',
@@ -148,7 +185,7 @@ export const SmartRouteChat: React.FC<SmartRouteChatProps> = ({ context, onActio
           >
             <div>
               <div style={{ fontSize: 14, fontWeight: 700 }}>SmartRoute Assistant</div>
-              <div style={{ fontSize: 11, opacity: 0.8 }}>Hỏi về tuyến đường, giao thông, giờ đi</div>
+              <div style={{ fontSize: 11, opacity: 0.8 }}>Hoi ve tuyen duong, giao thong, gio di</div>
             </div>
             <button
               type="button"
@@ -183,7 +220,7 @@ export const SmartRouteChat: React.FC<SmartRouteChatProps> = ({ context, onActio
             {messages.length === 0 && (
               <div style={{ textAlign: 'center', padding: '16px 8px 8px' }}>
                 <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>
-                  Hãy hỏi về tình hình giao thông hoặc tuyến đường của bạn.
+                  Hay hoi ve tinh hinh giao thong hoac tuyen duong cua ban.
                 </div>
                 <SuggestedPrompts onSelect={(prompt) => void sendMessage(prompt)} />
               </div>
@@ -202,7 +239,7 @@ export const SmartRouteChat: React.FC<SmartRouteChatProps> = ({ context, onActio
                     fontSize: 13,
                   }}
                 >
-                  <span style={{ animation: 'pulse 1.2s ease-in-out infinite' }}>Đang suy nghĩ...</span>
+                  <span style={{ animation: 'pulse 1.2s ease-in-out infinite' }}>Dang suy nghi...</span>
                 </div>
               </div>
             )}
@@ -230,7 +267,7 @@ export const SmartRouteChat: React.FC<SmartRouteChatProps> = ({ context, onActio
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Hỏi về giao thông..."
+              placeholder="Hoi ve giao thong..."
               disabled={loading}
               style={{
                 flex: 1,
