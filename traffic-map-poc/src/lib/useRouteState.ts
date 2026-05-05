@@ -89,10 +89,6 @@ export function useRouteState(): UseRouteStateResult {
   }, []);
 
   const requestDepartureRecommendation = useCallback(async (routeData: RouteData) => {
-    if (!origin || !destination) {
-      return;
-    }
-
     setDepartureRecommendation(null);
     setRecommendationLoading(true);
 
@@ -103,11 +99,8 @@ export function useRouteState(): UseRouteStateResult {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          origin,
-          destination,
-          profile: 'car',
+          route: routeData,
           candidateOffsets: [0, 15, 30, 60],
-          includeSteps: true,
         }),
       });
 
@@ -123,7 +116,7 @@ export function useRouteState(): UseRouteStateResult {
     } finally {
       setRecommendationLoading(false);
     }
-  }, [destination, origin]);
+  }, []);
 
   const requestRoute = useCallback(async (params: { departureOffsetMinutes: DepartureOffsetMinutes; targetHour?: number; targetWeekday?: number }) => {
     if (!origin || !destination) {
@@ -135,8 +128,6 @@ export function useRouteState(): UseRouteStateResult {
     setDepartureRecommendation(null);
     setRecommendationLoading(false);
     setRouteError(null);
-    setAlternativeRoutes([]);
-    setSelectedRouteId(null);
 
     try {
       const response = await fetch('/api/route/alternatives', {
@@ -174,8 +165,6 @@ export function useRouteState(): UseRouteStateResult {
         void requestDepartureRecommendation(routes[0].route);
       }
     } catch (error) {
-      setAlternativeRoutes([]);
-      setSelectedRouteId(null);
       setDepartureRecommendation(null);
       setRouteError(error instanceof Error ? error.message : 'Failed to build route');
     } finally {

@@ -29,12 +29,21 @@ interface GraphHopperResponse {
 }
 
 const GRAPH_HOPPER_BASE_URL = 'https://graphhopper.com/api/1/route';
+const ROUTE_CACHE_TTL_MS = 30 * 1000;
 
 const GRAPH_HOPPER_PROFILES: Record<RouteProfile, string> = {
   car: 'car',
   bike: 'bike',
   walk: 'foot',
 };
+
+type CachedGraphHopperPayload = {
+  expiresAt: number;
+  payload: GraphHopperResponse;
+};
+
+const routeCache = new Map<string, CachedGraphHopperPayload>();
+const inFlightRequests = new Map<string, Promise<GraphHopperResponse>>();
 
 export class RouteApiError extends Error {
   code: ApiError['code'];
@@ -56,26 +65,13 @@ export async function getGraphHopperRoute(params: {
     throw new RouteApiError('provider_error', 'Missing GRAPHHOPPER_API_KEY on the server.');
   }
 
-  const url = buildGraphHopperUrl({
+  const payload = await fetchGraphHopperRoute({
     origin: params.origin,
     destination: params.destination,
     profile: params.profile,
     includeSteps: params.includeSteps,
     apiKey,
   });
-
-  const response = await fetch(url, {
-    method: 'GET',
-    cache: 'no-store',
-    headers: {
-      Accept: 'application/json',
-    },
-  });
-
-  const payload = (await response.json()) as GraphHopperResponse;
-  if (!response.ok) {
-    throw mapGraphHopperError(response.status, payload);
-  }
 
   const path = payload.paths?.[0];
   if (!path?.points || path.distance == null || path.time == null || !path.bbox) {
@@ -163,25 +159,46 @@ async function fetchGraphHopperRoute(params: {
         includeSteps: params.includeSteps,
         apiKey: params.apiKey,
       });
-
-  const response = await fetch(url, {
-    method: useAlternatives ? 'POST' : 'GET',
-    cache: 'no-store',
-    headers: {
-      Accept: 'application/json',
-      ...(useAlternatives ? { 'Content-Type': 'application/json' } : {}),
-    },
-    body: useAlternatives
-      ? JSON.stringify(buildAlternativeRouteRequestBody(params))
-      : undefined,
-  });
-
-  const payload = (await response.json()) as GraphHopperResponse;
-  if (!response.ok) {
-    throw mapGraphHopperError(response.status, payload);
+  const cacheKey = buildRouteCacheKey(params, useAlternatives);
+  const cachedPayload = getCachedRoutePayload(cacheKey);
+  if (cachedPayload) {
+    return cachedPayload;
   }
 
-  return payload;
+  const existingRequest = inFlightRequests.get(cacheKey);
+  if (existingRequest) {
+    return existingRequest;
+  }
+
+  const requestPromise = (async () => {
+    const response = await fetch(url, {
+      method: useAlternatives ? 'POST' : 'GET',
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/json',
+        ...(useAlternatives ? { 'Content-Type': 'application/json' } : {}),
+      },
+      body: useAlternatives
+        ? JSON.stringify(buildAlternativeRouteRequestBody(params))
+        : undefined,
+    });
+
+    const payload = (await response.json()) as GraphHopperResponse;
+    if (!response.ok) {
+      throw mapGraphHopperError(response.status, payload);
+    }
+
+    setCachedRoutePayload(cacheKey, payload);
+    return payload;
+  })();
+
+  inFlightRequests.set(cacheKey, requestPromise);
+
+  try {
+    return await requestPromise;
+  } finally {
+    inFlightRequests.delete(cacheKey);
+  }
 }
 
 function buildAlternativeRouteRequestBody(params: {
@@ -210,6 +227,57 @@ function buildAlternativeRouteRequestBody(params: {
 function clampAlternativeMaxPaths(value?: number) {
   if (value == null || Number.isNaN(value)) return 3;
   return Math.max(1, Math.min(3, Math.round(value)));
+}
+
+function buildRouteCacheKey(
+  params: {
+    origin: Coordinate;
+    destination: Coordinate;
+    profile: RouteProfile;
+    includeSteps: boolean;
+    alternativeRoute?: AlternativeRouteOptions;
+  },
+  useAlternatives: boolean,
+) {
+  const base = [
+    useAlternatives ? 'alternatives' : 'route',
+    params.profile,
+    `${params.origin[0]},${params.origin[1]}`,
+    `${params.destination[0]},${params.destination[1]}`,
+    params.includeSteps ? 'steps' : 'no-steps',
+  ];
+
+  if (!useAlternatives) {
+    return base.join('|');
+  }
+
+  return [
+    ...base,
+    String(clampAlternativeMaxPaths(params.alternativeRoute?.maxPaths)),
+    String(params.alternativeRoute?.maxWeightFactor ?? 1.4),
+    String(params.alternativeRoute?.maxShareFactor ?? 0.6),
+  ].join('|');
+}
+
+function getCachedRoutePayload(cacheKey: string) {
+  const cached = routeCache.get(cacheKey);
+  if (!cached) {
+    return null;
+  }
+
+  if (cached.expiresAt <= Date.now()) {
+    routeCache.delete(cacheKey);
+    return null;
+  }
+
+  return cached.payload;
+}
+
+function setCachedRoutePayload(cacheKey: string, payload: GraphHopperResponse) {
+  routeCache.set(cacheKey, {
+    expiresAt: Date.now() + ROUTE_CACHE_TTL_MS,
+    payload,
+  });
 }
 
 function mapGraphHopperError(status: number, payload: GraphHopperResponse) {

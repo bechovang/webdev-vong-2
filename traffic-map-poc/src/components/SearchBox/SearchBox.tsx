@@ -48,8 +48,14 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
   const originSearch = useSearch(mapCenter);
   const destSearch = useSearch(mapCenter);
   const containerRef = useRef<HTMLDivElement>(null);
+  const latestMapCenterRef = useRef(mapCenter);
+  const lastHandledChatCommandIdRef = useRef<number | null>(null);
 
   const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    latestMapCenterRef.current = mapCenter;
+  }, [mapCenter]);
 
   useEffect(() => {
     if (routeDestination) {
@@ -61,6 +67,9 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
 
   useEffect(() => {
     if (!chatCommand) return;
+    if (lastHandledChatCommandIdRef.current === chatCommand.id) return;
+
+    lastHandledChatCommandIdRef.current = chatCommand.id;
 
     if (chatCommand.type === 'open_route_panel') {
       setMode('route');
@@ -80,8 +89,8 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
       destSearch.setInput(destinationQuery);
 
       const [resolvedOrigin, resolvedDestination] = await Promise.all([
-        resolveRoutePoint(originQuery, mapCenter),
-        resolveRoutePoint(destinationQuery, mapCenter),
+        resolveRoutePoint(originQuery, latestMapCenterRef.current),
+        resolveRoutePoint(destinationQuery, latestMapCenterRef.current),
       ]);
 
       if (cancelled) return;
@@ -113,7 +122,7 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [chatCommand, destSearch.setInput, mapCenter, onRoute, originSearch.setInput]);
+  }, [chatCommand, destSearch.setInput, onRoute, originSearch.setInput]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {

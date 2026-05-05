@@ -67,15 +67,17 @@ export type TrafficHotspot = {
   lng: number;
   radius_meters: number;
   description?: string;
+  realtime_status?: 'ok' | 'disabled' | 'error';
+  realtime_message?: string;
   realtime?: {
-    current_speed: number;
-    free_flow_speed: number;
-    speed_ratio: number;
-    current_travel_time: number;
-    free_flow_travel_time: number;
-    delay_ratio: number;
-    confidence: number;
-    road_closure: boolean;
+    current_speed?: number;
+    free_flow_speed?: number;
+    speed_ratio?: number;
+    current_travel_time?: number;
+    free_flow_travel_time?: number;
+    delay_ratio?: number;
+    confidence?: number;
+    road_closure?: boolean;
     severity?: number;
   } | null;
 };

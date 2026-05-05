@@ -141,12 +141,8 @@ export type AlternativeRouteResponse =
   | RouteResponseError;
 
 export interface DepartureRecommendationRequest {
-  origin: Coordinate;
-  destination: Coordinate;
-  profile?: RouteProfile;
+  route: RouteData;
   candidateOffsets?: DepartureOffsetMinutes[];
-  includeSteps?: boolean;
-  includePredictionAnalysis?: boolean;
 }
 
 export interface DepartureRecommendationResponseSuccess {
