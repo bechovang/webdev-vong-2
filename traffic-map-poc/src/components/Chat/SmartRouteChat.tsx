@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { ChatAction, ChatClientContext, ChatMessageData, ChatResponse } from '@/lib/chat/types';
 import ChatMessage from './ChatMessage';
 import SuggestedPrompts from './SuggestedPrompts';
@@ -16,8 +17,14 @@ export const SmartRouteChat: React.FC<SmartRouteChatProps> = ({ context, onActio
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -110,13 +117,13 @@ export const SmartRouteChat: React.FC<SmartRouteChatProps> = ({ context, onActio
       };
 
   const panelStyle: React.CSSProperties = inline
-    ? {
-        position: 'absolute',
-        top: 58,
-        right: 0,
+      ? {
+        position: 'fixed',
+        top: 80,
+        left: 10,
         zIndex: 1300,
         width: 'min(380px, calc(100vw - 32px))',
-        height: 'min(420px, calc(100vh - 180px))',
+        height: 'min(420px, calc(100vh - 96px))',
         background: 'white',
         borderRadius: 16,
         boxShadow: '0 10px 40px rgba(15, 23, 42, 0.2)',
@@ -138,6 +145,151 @@ export const SmartRouteChat: React.FC<SmartRouteChatProps> = ({ context, onActio
         flexDirection: 'column',
         overflow: 'hidden',
       };
+
+  const panel = open ? (
+    <div style={panelStyle}>
+      <div
+        style={{
+          padding: '12px 16px',
+          background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+          color: 'white',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexShrink: 0,
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>SmartRoute Assistant</div>
+          <div style={{ fontSize: 11, opacity: 0.8 }}>Hoi ve tuyen duong, giao thong, gio di</div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          style={{
+            background: 'rgba(255,255,255,0.2)',
+            border: 'none',
+            color: 'white',
+            width: 28,
+            height: 28,
+            borderRadius: '50%',
+            cursor: 'pointer',
+            fontSize: 16,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          &times;
+        </button>
+      </div>
+
+      <div
+        ref={scrollRef}
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: 12,
+          background: '#fafafa',
+        }}
+      >
+        {messages.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '16px 8px 8px' }}>
+            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>
+              Hay hoi ve tinh hinh giao thong hoac tuyen duong cua ban.
+            </div>
+            <SuggestedPrompts onSelect={(prompt) => void sendMessage(prompt)} />
+          </div>
+        )}
+        {messages.map((msg, i) => (
+          <ChatMessage key={i} message={msg} onAction={onAction} />
+        ))}
+        {loading && (
+          <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 8 }}>
+            <div
+              style={{
+                padding: '8px 14px',
+                borderRadius: '12px 12px 12px 2px',
+                background: '#f1f5f9',
+                color: '#64748b',
+                fontSize: 13,
+              }}
+            >
+              <span style={{ animation: 'pulse 1.2s ease-in-out infinite' }}>Dang suy nghi...</span>
+            </div>
+          </div>
+        )}
+        <style>{`
+          @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+          }
+        `}</style>
+      </div>
+
+      <form
+        onSubmit={handleSubmit}
+        style={{
+          display: 'flex',
+          gap: 8,
+          padding: '10px 12px',
+          borderTop: '1px solid #e2e8f0',
+          background: 'white',
+          flexShrink: 0,
+        }}
+      >
+        <input
+          ref={inputRef}
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Hoi ve giao thong..."
+          disabled={loading}
+          style={{
+            flex: 1,
+            padding: '8px 12px',
+            borderRadius: 999,
+            border: '1px solid #e2e8f0',
+            fontSize: 13,
+            outline: 'none',
+            background: '#f8fafc',
+          }}
+        />
+        <button
+          type="submit"
+          disabled={loading || !input.trim()}
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: '50%',
+            border: 'none',
+            background: loading || !input.trim() ? '#cbd5e1' : '#7c3aed',
+            color: 'white',
+            cursor: loading || !input.trim() ? 'default' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            transition: 'background 0.15s',
+          }}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="22" y1="2" x2="11" y2="13" />
+            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+          </svg>
+        </button>
+      </form>
+    </div>
+  ) : null;
 
   return (
     <>
@@ -170,150 +322,7 @@ export const SmartRouteChat: React.FC<SmartRouteChatProps> = ({ context, onActio
         </button>
       )}
 
-      {open && (
-        <div style={panelStyle}>
-          <div
-            style={{
-              padding: '12px 16px',
-              background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
-              color: 'white',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>SmartRoute Assistant</div>
-              <div style={{ fontSize: 11, opacity: 0.8 }}>Hoi ve tuyen duong, giao thong, gio di</div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              style={{
-                background: 'rgba(255,255,255,0.2)',
-                border: 'none',
-                color: 'white',
-                width: 28,
-                height: 28,
-                borderRadius: '50%',
-                cursor: 'pointer',
-                fontSize: 16,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              &times;
-            </button>
-          </div>
-
-          <div
-            ref={scrollRef}
-            style={{
-              flex: 1,
-              overflowY: 'auto',
-              padding: 12,
-              background: '#fafafa',
-            }}
-          >
-            {messages.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '16px 8px 8px' }}>
-                <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>
-                  Hay hoi ve tinh hinh giao thong hoac tuyen duong cua ban.
-                </div>
-                <SuggestedPrompts onSelect={(prompt) => void sendMessage(prompt)} />
-              </div>
-            )}
-            {messages.map((msg, i) => (
-              <ChatMessage key={i} message={msg} onAction={onAction} />
-            ))}
-            {loading && (
-              <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 8 }}>
-                <div
-                  style={{
-                    padding: '8px 14px',
-                    borderRadius: '12px 12px 12px 2px',
-                    background: '#f1f5f9',
-                    color: '#64748b',
-                    fontSize: 13,
-                  }}
-                >
-                  <span style={{ animation: 'pulse 1.2s ease-in-out infinite' }}>Dang suy nghi...</span>
-                </div>
-              </div>
-            )}
-            <style>{`
-              @keyframes pulse {
-                0%, 100% { opacity: 1; }
-                50% { opacity: 0.4; }
-              }
-            `}</style>
-          </div>
-
-          <form
-            onSubmit={handleSubmit}
-            style={{
-              display: 'flex',
-              gap: 8,
-              padding: '10px 12px',
-              borderTop: '1px solid #e2e8f0',
-              background: 'white',
-              flexShrink: 0,
-            }}
-          >
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Hoi ve giao thong..."
-              disabled={loading}
-              style={{
-                flex: 1,
-                padding: '8px 12px',
-                borderRadius: 999,
-                border: '1px solid #e2e8f0',
-                fontSize: 13,
-                outline: 'none',
-                background: '#f8fafc',
-              }}
-            />
-            <button
-              type="submit"
-              disabled={loading || !input.trim()}
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: '50%',
-                border: 'none',
-                background: loading || !input.trim() ? '#cbd5e1' : '#7c3aed',
-                color: 'white',
-                cursor: loading || !input.trim() ? 'default' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                transition: 'background 0.15s',
-              }}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="22" y1="2" x2="11" y2="13" />
-                <polygon points="22 2 15 22 11 13 2 9 22 2" />
-              </svg>
-            </button>
-          </form>
-        </div>
-      )}
+      {inline ? (mounted && panel ? createPortal(panel, document.body) : null) : panel}
     </>
   );
 };
