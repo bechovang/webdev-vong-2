@@ -1,0 +1,721 @@
+% !TeX program = xelatex
+% !TeX encoding = UTF-8
+
+\documentclass[12pt,a4paper]{article}
+
+\usepackage{fontspec}
+\usepackage{xunicode}
+\usepackage{xltxtra}
+\usepackage[vietnamese]{babel}
+
+\setmainfont{Times New Roman}
+\setsansfont{Arial}
+\setmonofont{Courier New}
+
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{xltabular}
+\usepackage{multirow}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{tocloft}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{listings}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc}
+
+\geometry{
+    left=2.5cm,
+    right=2.5cm,
+    top=2.5cm,
+    bottom=2.5cm
+}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    urlcolor=cyan,
+    citecolor=blue,
+    pdftitle={Technical Report - SmartRoute},
+    pdfauthor={Underrated},
+    pdfsubject={WebDev Adventure 2026 - Round 3},
+    pdfkeywords={SmartRoute, traffic-map-poc, routing, maplibre, graphhopper, xgboost, chatbot}
+}
+
+\titleformat{\section}
+  {\normalfont\Large\bfseries}{\thesection.}{0.5em}{\MakeUppercase}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries}{\thesubsection.}{0.5em}{}
+\titleformat{\subsubsection}
+  {\normalfont\normalsize\bfseries}{\thesubsubsection.}{0.5em}{}
+
+\renewcommand{\thesection}{\arabic{section}}
+\renewcommand{\thesubsection}{\thesection.\arabic{subsection}}
+
+\setlength{\parindent}{1.25cm}
+\setlength{\parskip}{0.2em}
+\setlength{\headheight}{15pt}
+\renewcommand{\arraystretch}{1.25}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{WebDev Adventure 2026}
+\fancyhead[R]{SmartRoute}
+\fancyfoot[C]{\thepage}
+
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    columns=fullflexible
+}
+
+\begin{document}
+
+\begin{titlepage}
+    \newgeometry{left=2.2cm,right=2.2cm,top=1.5cm,bottom=1.7cm}
+    \begin{tikzpicture}[overlay,remember picture]
+        \draw[line width=1.4pt, color=blue!70!black]
+            ($(current page.north west)+(0.55cm,-0.55cm)$)
+            rectangle
+            ($(current page.south east)+(-0.55cm,0.55cm)$);
+        \draw[line width=0.5pt, color=blue!50!black]
+            ($(current page.north west)+(0.72cm,-0.72cm)$)
+            rectangle
+            ($(current page.south east)+(-0.72cm,0.72cm)$);
+    \end{tikzpicture}
+
+    \centering
+    \includegraphics[width=8.3cm]{images/banner.png}\\[0.55cm]
+
+    {\large\textbf{TRƯỜNG ĐẠI HỌC CÔNG NGHỆ THÔNG TIN, ĐHQG -- HCM}}\\[0.45cm]
+    {\large\textbf{CÂU LẠC BỘ LẬP TRÌNH WEB -- WEBDEV STUDIOS}}\\[0.45cm]
+    {\large\textbf{CUỘC THI ``WEBDEV ADVENTURE 2026''}}\\[5.6cm]
+
+    {\Large\textbf{Underrated}}\\[0.55cm]
+    {\Large\textbf{SmartRoute}}\\[0.2cm]
+    {\large\textit{Nền tảng web hỗ trợ dự đoán tình trạng giao thông\\
+    và gợi ý lộ trình tối ưu cho TP. Hồ Chí Minh}}\\[0.3cm]
+
+    \vfill
+    {\large\textbf{TP. HỒ CHÍ MINH, 2026}}
+    \restoregeometry
+\end{titlepage}
+
+\setcounter{tocdepth}{1}
+\tableofcontents
+\clearpage
+\listoffigures
+\clearpage
+\listoftables
+\clearpage
+
+\section*{DANH MỤC TỪ VIẾT TẮT}
+\addcontentsline{toc}{section}{Danh mục từ viết tắt}
+\begin{longtable}{L{3cm}L{11cm}}
+\textbf{AI} & Artificial Intelligence -- Trí tuệ nhân tạo. \\
+\textbf{API} & Application Programming Interface -- Giao diện lập trình ứng dụng. \\
+\textbf{BFF} & Backend for Frontend -- Lớp backend phục vụ frontend. \\
+\textbf{CORS} & Cross-Origin Resource Sharing. \\
+\textbf{CSV} & Comma-Separated Values -- Định dạng dữ liệu bảng. \\
+\textbf{ETA} & Estimated Time of Arrival -- Thời gian đến dự kiến. \\
+\textbf{ETL} & Extract, Transform, Load. \\
+\textbf{GIS} & Geographic Information System -- Hệ thống thông tin địa lý. \\
+\textbf{LOS} & Level of Service -- Mức độ phục vụ giao thông, phân loại từ A đến F. \\
+\textbf{LLM} & Large Language Model -- Mô hình ngôn ngữ lớn. \\
+\textbf{ML} & Machine Learning -- Học máy. \\
+\textbf{OSM} & OpenStreetMap -- Nguồn dữ liệu bản đồ mở. \\
+\textbf{PoC} & Proof of Concept -- Bản minh chứng ý tưởng. \\
+\textbf{REST} & Representational State Transfer. \\
+\textbf{UI/UX} & User Interface / User Experience -- Giao diện và trải nghiệm người dùng. \\
+\textbf{XGBoost} & eXtreme Gradient Boosting -- Thuật toán học máy. \\
+\end{longtable}
+\clearpage
+
+%% ============================================================
+%% PHẦN I: TỔNG QUAN DỰ ÁN
+%% ============================================================
+\section{TỔNG QUAN DỰ ÁN}
+
+\subsection{Bối cảnh và ý tưởng hình thành}
+TP. Hồ Chí Minh là một trong những thành phố có mật độ giao thông cao nhất Việt Nam với hơn 10 triệu dân và hơn 8 triệu phương tiện cơ giới. Tình trạng ùn tắc giao thông diễn ra thường xuyên, đặc biệt trong các giờ cao điểm sáng (7h--9h) và chiều (17h--20h), gây thiệt hại kinh tế ước tính hàng tỷ USD mỗi năm. Các ứng dụng bản đồ hiện tại như Google Maps, Waze chủ yếu phản ánh tình trạng giao thông thời điểm hiện tại và đưa ra lộ trình dựa trên dữ liệu tức thời. Người dùng thiếu một công cụ cho phép ``nhìn trước'' tình trạng giao thông trong 15--60 phút tới để chủ động quyết định thời điểm xuất phát và lộ trình di chuyển.
+
+Từ nhu cầu thực tế này, đội Underrated đã phát triển SmartRoute -- một nền tảng web kết hợp bản đồ giao thông thông minh, trí tuệ nhân tạo (XGBoost) và trợ lý ảo nhằm hỗ trợ người dùng dự đoán tình trạng giao thông ngắn hạn, phân tích rủi ro ùn tắc dọc tuyến, gợi ý thời điểm xuất phát tối ưu và đề xuất lộ trình thay thế.
+
+\subsection{Bài toán và nhu cầu giải quyết}
+SmartRoute hướng tới giải quyết ba bài toán chính cho người dùng di chuyển tại TP. Hồ Chí Minh:
+\begin{itemize}[leftmargin=1.2cm]
+    \item \textbf{Dự báo giao thông ngắn hạn:} Cho phép người dùng xem trước tình trạng ùn tắc tại các mốc thời gian +15, +30, +60 phút.
+    \item \textbf{Gợi ý thời điểm xuất phát:} Thay vì chỉ xem tuyến đường, người dùng biết nên đi ngay, chờ 15 phút hay chờ 30 phút để giảm thiểu rủi ro kẹt xe.
+    \item \textbf{So sánh và đề xuất lộ trình:} Hệ thống đánh giá nhiều tuyến đường thay thế dựa trên dự báo giao thông, không chỉ khoảng cách ngắn nhất.
+\end{itemize}
+
+\subsection{Mục tiêu dự án}
+\begin{itemize}[leftmargin=1.2cm]
+    \item Xây dựng một web application bản đồ giao thông thông minh cho TP. Hồ Chí Minh.
+    \item Tích hợp mô hình AI (XGBoost) dự đoán Level of Service (LOS) cho hơn 84.000 đoạn đường với độ chính xác cao.
+    \item Kết hợp dữ liệu giao thông thời gian thực (TomTom API) để điều chỉnh dự báo.
+    \item Cung cấp trợ lý AI (LLM) hỗ trợ người dùng tương tác bằng tiếng Việt.
+    \item Phát triển hệ thống chạy được thực tế trên môi trường web, có thể deploy lên cloud.
+\end{itemize}
+
+\subsection{Phạm vi triển khai}
+Trong khuôn khổ cuộc thi WebDev Adventure 2026, SmartRoute đã triển khai hoàn chỉnh các thành phần sau:
+\begin{itemize}[leftmargin=1.2cm]
+    \item Backend API (Python/FastAPI) phục vụ dự đoán giao thông bằng mô hình XGBoost đã huấn luyện.
+    \item Frontend web (Next.js 15/React 19) với bản đồ tương tác MapLibre GL.
+    \item Routing engine tích hợp GraphHopper API với phân tích traffic-aware.
+    \item Hệ thống gợi ý thời điểm xuất phát và so sánh lộ trình thay thế.
+    \item Trợ lý AI chatbot với khả năng hiểu tiếng Việt và điều khiển bản đồ.
+    \item Tích hợp dữ liệu giao thông thời gian thực qua TomTom Traffic API.
+\end{itemize}
+
+Dữ liệu sử dụng: HCM Traffic Data 2025 từ Sở GTVT TP. Hồ Chí Minh, bao gồm 33.441 quan sát, 10.027 road segments, thời gian từ 03/07/2020 đến 22/04/2021, phân giải 30 phút.
+
+%% ============================================================
+%% PHẦN II: PHÂN TÍCH VÀ THIẾT KẾ
+%% ============================================================
+\section{PHÂN TÍCH VÀ THIẾT KẾ}
+
+\subsection{Phân tích yêu cầu}
+Dựa trên bài toán đã xác định, các yêu cầu chức năng chính được phân tích như sau:
+
+\begin{table}[H]
+\centering
+\caption{Phân tích yêu cầu chức năng}
+\begin{tabularx}{\textwidth}{p{0.6cm}L{3cm}Yp{1.8cm}}
+\toprule
+\textbf{STT} & \textbf{Yêu cầu} & \textbf{Mô tả} & \textbf{Độ ưu tiên} \\
+\midrule
+1 & Hiển thị bản đồ giao thông & Bản đồ tương tác hiển thị road segments được tô màu theo mức độ LOS (A--F), hỗ trợ pan/zoom, viewport-based loading & Cao \\[4pt]
+2 & Dự đoán giao thông bằng AI & Sử dụng XGBoost để dự đoán LOS cho từng đoạn đường theo các mốc thời gian now/+15/+30/+60 phút & Cao \\[4pt]
+3 & Tìm kiếm địa điểm & Geocoding qua Photon API, hỗ trợ nhập tọa độ trực tiếp, hiển thị marker trên bản đồ & Cao \\[4pt]
+4 & Tìm đường (Routing) & Tích hợp GraphHopper API, hiển thị tuyến đường với ETA, quãng đường, bước chỉ đường & Cao \\[4pt]
+5 & Phân tích ùn tắc dọc tuyến & Match segments dọc route, tính congestion score, risk level, coverage & Cao \\[4pt]
+6 & Gợi ý thời điểm xuất phát & So sánh 4 mốc (0/15/30/60 phút), chấm điểm duration + congestion + risk, đề xuất thời điểm tốt nhất & Trung bình \\[4pt]
+7 & Lộ trình thay thế & Đề xuất 2--3 route alternatives, xếp hạng theo traffic prediction, hiển thị trade-off & Trung bình \\[4pt]
+8 & Trợ lý AI chatbot & Chat tiếng Việt, nhận diện intent, điều khiển bản đồ (set route, set time), LLM enhancement & Trung bình \\[4pt]
+9 & Dữ liệu thời gian thực & Tích hợp TomTom Traffic API, điều chỉnh dự báo XGBoost bằng dữ liệu real-time & Trung bình \\[4pt]
+10 & Giao diện responsive & Hỗ trợ cả desktop và mobile, panel thu gọn, touch-friendly & Cao \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Thiết kế giao diện người dùng (UI) và trải nghiệm người dùng (UX)}
+Giao diện SmartRoute được thiết kế theo mô hình single-page application với layout tập trung vào bản đồ. Thiết kế ưu tiên trải nghiệm trên desktop nhưng vẫn đảm bảo usable trên mobile.
+
+\textbf{Các thành phần UI chính:}
+\begin{itemize}[leftmargin=1.2cm]
+    \item \textbf{Bản đồ toàn màn hình (MapLibre GL):} Nền bản đồ OpenStreetMap, tự động fit về TP. Hồ Chí Minh. Road segments hiển thị dưới dạng line layer với màu tương ứng LOS (A=xanh lá $\rightarrow$ F=đỏ).
+    \item \textbf{Thanh tìm kiếm (SearchBox):} Hỗ trợ dual-mode (Explore/Route). Chế độ Explore cho phép tìm kiếm địa điểm. Chế độ Route cho phép chọn điểm đi/đến và yêu cầu tìm đường.
+    \item \textbf{Panel thông tin route (RouteSummaryPanel):} Hiển thị quãng đường, ETA, phân tích ùn tắc, risk level, gợi ý thời điểm xuất phát, lộ trình thay thế và bước chỉ đường chi tiết.
+    \item \textbf{Thanh chọn thời gian (TimePicker):} 4 preset (Now/+15/+30/+60) và custom picker cho phép chọn giờ/phút/ngày cụ thể.
+    \item \textbf{Trợ lý chat (SmartRouteChat):} Panel chat floating, hỗ trợ tiếng Việt, có suggested prompts và action buttons để điều khiển bản đồ.
+    \item \textbf{Inspector hotspot (HotspotInspector):} Panel liệt kê các điểm nóng giao thông với severity badges.
+\end{itemize}
+
+Quyết định thiết kế: Tập trung bản đồ chiếm toàn bộ viewport, các panel điều khiển overlay trên bản đồ thay vì chia layout cột. Điều giúp tối ưu hóa không gian hiển thị dữ liệu giao thông.
+
+\subsection{Thiết kế kiến trúc hệ thống}
+
+\subsubsection{Kiến trúc tổng thể}
+SmartRoute sử dụng kiến trúc multi-tier với Frontend (Next.js) đóng vai trò BFF (Backend for Frontend), kết nối đến Backend API (FastAPI) và các dịch vụ ngoài.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    ui/.style={draw, rounded corners, align=center, minimum width=3.8cm, minimum height=1cm, fill=blue!8},
+    api/.style={draw, rounded corners, align=center, minimum width=3.8cm, minimum height=1cm, fill=green!8},
+    ext/.style={draw, rounded corners, align=center, minimum width=3.8cm, minimum height=1cm, fill=orange!10},
+    data/.style={draw, rounded corners, align=center, minimum width=3.8cm, minimum height=1cm, fill=gray!12},
+    ml/.style={draw, rounded corners, align=center, minimum width=3.8cm, minimum height=1cm, fill=purple!10},
+    arrow/.style={-{Latex[length=2.5mm]}, thick}
+]
+
+% Row 1 - Browser
+\node[ui] at (0, 0) (user) {Người dùng\\Browser};
+
+% Row 2 - Frontend
+\node[ui] at (0, -2) (fe) {Next.js Client UI\\MapView, SearchBox, RouteLayer, Chat};
+
+% Row 3 - BFF Layer
+\node[api] at (-4, -4.2) (bff1) {BFF API Routes\\\texttt{/api/segments-hcmc}};
+\node[api] at (4, -4.2) (bff2) {BFF API Routes\\\texttt{/api/route, /api/chat}};
+
+% Row 4 - Backend
+\node[ml] at (-4, -6.4) (fastapi) {FastAPI Backend\\XGBoost Prediction};
+\node[data] at (0, -6.4) (db) {SQLite Database\\84k segments, 577k nodes};
+\node[api] at (4, -6.4) (bff3) {BFF Route Alt.\\\texttt{/api/route/alternatives}};
+
+% Row 5 - External
+\node[ext] at (-5.5, -8.6) (gh) {GraphHopper API\\Routing};
+\node[ext] at (0, -8.6) (photon) {Photon API\\Geocoding};
+\node[ext] at (5.5, -8.6) (tomtom) {TomTom API\\Real-time Traffic};
+
+% Arrows
+\draw[arrow] (user) -- (fe);
+\draw[arrow] (fe) -- (bff1);
+\draw[arrow] (fe) -- (bff2);
+\draw[arrow] (bff1) -- (fastapi);
+\draw[arrow] (bff1) -- (db);
+\draw[arrow] (bff2) -- (gh);
+\draw[arrow] (bff2) -- (photon);
+\draw[arrow] (bff3) -- (gh);
+\draw[arrow] (fastapi) -- (db);
+\draw[arrow] (fastapi) -- (tomtom);
+\draw[arrow] (fe) -- (bff3);
+
+\end{tikzpicture}
+\caption{Kiến trúc multi-tier của SmartRoute}
+\label{fig:architecture}
+\end{figure}
+
+Bốn lớp kiến trúc chính:
+\begin{enumerate}[leftmargin=1.2cm]
+    \item \textbf{Lớp 1 -- Browser (React/Next.js):} Render giao diện bản đồ, search, route, chat. Sử dụng custom hooks để quản lý state (\texttt{useRouteState}, \texttt{useTrafficSegments}, \texttt{useMapPicking}).
+    \item \textbf{Lớp 2 -- Next.js API Routes (BFF):} Xử lý request từ browser, gọi các dịch vụ ngoài (FastAPI, GraphHopper, Photon, OpenRouter), tổng hợp và trả kết quả. Bao gồm 9 API endpoints: \texttt{segments}, \texttt{segments-hcmc}, \texttt{route}, \texttt{route/alternatives}, \texttt{route/recommend-departure}, \texttt{hotspots}, \texttt{search}, \texttt{chat}.
+    \item \textbf{Lớp 3 -- FastAPI Backend:} Server Python riêng biệt, load mô hình XGBoost đã huấn luyện, dự đoán LOS cho road segments. Gồm 4 router modules (health, predict, segments, hotspots) và module tích hợp TomTom real-time.
+    \item \textbf{Lớp 4 -- External Services:} GraphHopper (routing), Photon (geocoding), TomTom (real-time traffic), OpenRouter (LLM chat).
+\end{enumerate}
+
+\subsubsection{Các thành phần chính}
+\begin{table}[H]
+\centering
+\caption{Các thành phần hệ thống}
+\begin{tabularx}{\textwidth}{L{3cm}L{3.2cm}Y}
+\toprule
+\textbf{Thành phần} & \textbf{Công nghệ} & \textbf{Vai trò} \\
+\midrule
+Frontend & Next.js 15 + React 19 & Giao diện người dùng, bản đồ, search, chat \\[4pt]
+BFF Layer & Next.js API Routes & Tổng hợp dữ liệu, gọi services ngoài \\[4pt]
+Backend API & FastAPI + Uvicorn & ML prediction, segment data, real-time \\[4pt]
+ML Engine & XGBoost + scikit-learn & Dự đoán LOS (23 features, 97.78\% accuracy) \\[4pt]
+Database & SQLite & Lưu trữ nodes, segments, traffic history \\[4pt]
+Map Engine & MapLibre GL JS 5 & Render bản đồ, segments, routes \\[4pt]
+Routing & GraphHopper API & Tính toán tuyến đường \\[4pt]
+Geocoding & Photon API & Chuyển đổi địa chỉ $\leftrightarrow$ tọa độ \\[4pt]
+LLM Chat & OpenRouter (Qwen) & Trợ lý AI tiếng Việt \\[4pt]
+Real-time & TomTom Traffic API & Dữ liệu giao thông thời gian thực \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Thiết kế cơ sở dữ liệu}
+Hệ thống sử dụng SQLite làm cơ sở dữ liệu với 4 bảng chính:
+
+\subsubsection{Bảng nodes (577.000 bản ghi)}
+\begin{table}[H]
+\centering
+\begin{tabularx}{0.7\textwidth}{L{3cm}L{2.5cm}Y}
+\toprule
+\textbf{Trường} & \textbf{Kiểu} & \textbf{Mô tả} \\
+\midrule
+node\_id & INTEGER PK & Định danh nút giao thông \\
+longitude & REAL & Kinh độ \\
+latitude & REAL & Vĩ độ \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsubsection{Bảng segments (84.000 bản ghi)}
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{4cm}L{2.5cm}Y}
+\toprule
+\textbf{Trường} & \textbf{Kiểu} & \textbf{Mô tả} \\
+\midrule
+segment\_id & INTEGER PK & Định danh đoạn đường \\
+start\_node\_id / end\_node\_id & INTEGER FK & Tham chiếu đến bảng nodes \\
+s\_lat, s\_lng, e\_lat, e\_lng & REAL & Tọa độ đầu/cuối \\
+street\_name & TEXT & Tên đường \\
+street\_type & TEXT & Loại đường (residential, primary\ldots) \\
+street\_level & INTEGER & Cấp đường \\
+max\_velocity & REAL & Giới hạn tốc độ (km/h) \\
+length & REAL & Chiều dài đoạn (mét) \\
+has\_xgboost\_data & INTEGER & Có dữ liệu XGBoost hay không \\
+bbox\_* & REAL & Bounding box để truy vấn không gian \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsubsection{Bảng traffic\_history (33.441 bản ghi)}
+\begin{table}[H]
+\centering
+\begin{tabularx}{0.7\textwidth}{L{3cm}L{2.5cm}Y}
+\toprule
+\textbf{Trường} & \textbf{Kiểu} & \textbf{Mô tả} \\
+\midrule
+segment\_id & INTEGER FK & Tham chiếu segments \\
+timestamp & TEXT & Thời gian quan sát (ISO) \\
+los & TEXT & Mức LOS (A--F) \\
+los\_encoded & INTEGER & LOS dạng số (0--5) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsubsection{Bảng historical\_stats}
+\begin{table}[H]
+\centering
+\begin{tabularx}{0.8\textwidth}{L{3.2cm}L{2.5cm}Y}
+\toprule
+\textbf{Trường} & \textbf{Kiểu} & \textbf{Mô tả} \\
+\midrule
+segment\_id & INTEGER FK & Tham chiếu segments \\
+hour & INTEGER & Giờ trong ngày (0--23) \\
+weekday & INTEGER & Ngày trong tuần (0=Thứ Hai) \\
+mean\_los & REAL & LOS trung bình đã tính trước \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsubsection{Mô hình đặc trưng XGBoost (23 features)}
+Mô hình sử dụng 23 đặc trưng được engineer từ dữ liệu gốc, chia thành 5 nhóm:
+\begin{itemize}[leftmargin=1.2cm]
+    \item \textbf{Temporal (8):} hour, minute, weekday, month, day\_of\_month, is\_weekend, is\_rush\_hour, is\_night.
+    \item \textbf{Spatial (4):} street\_type\_encoded, street\_level, length, max\_velocity\_imputed.
+    \item \textbf{Lag (6):} LOS tại 1, 2, 3, 48, 96, 336 chu kỳ trước.
+    \item \textbf{Rolling (3):} rolling\_mean\_3, rolling\_mode\_6, rolling\_std\_6.
+    \item \textbf{Historical (2):} hist\_mean\_same\_hour, hist\_mean\_same\_weekday.
+\end{itemize}
+
+%% ============================================================
+%% PHẦN III: PHÁT TRIỂN SẢN PHẨM
+%% ============================================================
+\section{PHÁT TRIỂN SẢN PHẨM}
+
+\subsection{Công nghệ sử dụng}
+\begin{table}[H]
+\centering
+\caption{Công nghệ sử dụng trong dự án}
+\begin{tabularx}{\textwidth}{L{3cm}L{3cm}L{1.2cm}Y}
+\toprule
+\textbf{Danh mục} & \textbf{Công nghệ} & \textbf{Phiên bản} & \textbf{Lý do lựa chọn} \\
+\midrule
+Frontend Framework & Next.js & 15.x & SSR/SSG tối ưu SEO, API Routes tích hợp sẵn, file-based routing \\[4pt]
+UI Library & React & 19.x & Component-based, hooks mạnh mẽ, ecosystem lớn \\[4pt]
+Ngôn ngữ Frontend & TypeScript & 5.x & Type safety, IDE support tốt, giảm runtime errors \\[4pt]
+Bản đồ & MapLibre GL JS & 5.x & Open-source, hiệu năng cao, hỗ trợ vector tiles, free \\[4pt]
+React Map Bindings & react-map-gl & 8.x & Tích hợp MapLibre GL với React declarative \\[4pt]
+Backend Framework & FastAPI & Latest & Async, high performance, auto Swagger docs, dễ tích hợp ML \\[4pt]
+Ngôn ngữ Backend & Python & 3.11+ & Ecosystem ML/AI phong phú (XGBoost, sklearn, pandas) \\[4pt]
+ML Model & XGBoost & Latest & Hiệu suất cao cho tabular data, training nhanh, explainable \\[4pt]
+ML Utilities & scikit-learn, scipy & Latest & Preprocessing, evaluation, feature engineering \\[4pt]
+Xử lý dữ liệu & NumPy, Pandas & Latest & Data manipulation, CSV processing, feature engineering \\[4pt]
+Database & SQLite & Built-in & Nhẹ, không cần setup server, đủ cho PoC \\[4pt]
+Routing & GraphHopper API & External & Miễn phí giới hạn, hỗ trợ alternative routes \\[4pt]
+Geocoding & Photon API & External & Miễn phí, dựa trên OSM, hỗ trợ tiếng Việt \\[4pt]
+LLM Chat & OpenRouter & External & Truy cập nhiều model LLM, chi phí thấp, Qwen hỗ trợ tiếng Việt tốt \\[4pt]
+Real-time Traffic & TomTom Traffic API & External & Dữ liệu giao thông thời gian thực, coverage toàn cầu \\[4pt]
+Deployment (FE) & Vercel & -- & Tối ưu cho Next.js, deploy tự động, CDN toàn cầu \\[4pt]
+Deployment (BE) & Docker / Render & -- & Container hóa, dễ mở rộng, compatible với ML Python \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Quá trình phát triển}
+Quá trình phát triển SmartRoute được chia thành 5 phase chính:
+
+\subsubsection{Phase 1 -- Nền tảng bản đồ và dữ liệu}
+\begin{itemize}[leftmargin=1.2cm]
+    \item Khởi tạo Next.js 15 project với TypeScript.
+    \item Tích hợp MapLibre GL JS, hiển thị bản đồ OpenStreetMap centered tại TP. Hồ Chí Minh.
+    \item Import dữ liệu road segments (84.000 đoạn) và nodes (577.000 điểm) từ CSV.
+    \item Viewport-based loading: chỉ tải segments trong vùng đang xem, tối ưu hiệu năng.
+    \item Tích hợp Photon API cho geocoding và GraphHopper API cho routing.
+\end{itemize}
+
+\subsubsection{Phase 2 -- AI Prediction và Traffic Analysis}
+\begin{itemize}[leftmargin=1.2cm]
+    \item Xây dựng Python/FastAPI backend riêng biệt với SQLite database.
+    \item Huấn luyện XGBoost model trên 33.441 traffic observations, đạt accuracy 97,78\%.
+    \item Feature engineering: 23 features từ 5 nhóm (temporal, spatial, lag, rolling, historical).
+    \item Xây dựng TimePicker cho phép chọn mốc thời gian (now/+15/+30/+60/custom).
+    \item Route prediction analysis: phân tích ùn tắc dọc tuyến với congestion score, risk level, coverage.
+    \item Tích hợp TomTom Traffic API cho dữ liệu real-time, điều chỉnh dự báo XGBoost.
+\end{itemize}
+
+\subsubsection{Phase 3 -- Gợi ý thời điểm xuất phát}
+\begin{itemize}[leftmargin=1.2cm]
+    \item Xây dựng departure recommendation engine: so sánh 4 mốc thời gian (0/15/30/60 phút).
+    \item Scoring function: \texttt{predictedDuration $\times$ 0.6 + congestionScore $\times$ 0.25 + riskPenalty $\times$ 0.15}.
+    \item Hiển thị recommended departure time kèm trade-off explanation.
+\end{itemize}
+
+\subsubsection{Phase 4 -- Lộ trình thay thế}
+\begin{itemize}[leftmargin=1.2cm]
+    \item Tích hợp GraphHopper alternative routes API (1--3 alternatives).
+    \item Ranking engine: chấm từng route dựa trên predicted duration, delay, congestion, risk.
+    \item Label system: recommended, fastest, least\_congested, alternative.
+    \item UI: so sánh side-by-side các route với metrics và trade-off.
+\end{itemize}
+
+\subsubsection{Phase 5 -- Trợ lý AI Chatbot}
+\begin{itemize}[leftmargin=1.2cm]
+    \item Xây dựng chat orchestrator với 8 intents detection (tiếng Việt): departure\_recommendation, route\_recommendation, explain\_prediction, general\_route, traffic\_status, hotspot\_info, help, general.
+    \item Tích hợp OpenRouter LLM (Qwen) cho response enhancement.
+    \item Action system: chat có thể trigger UI actions (set route, set time, navigate).
+    \item Suggested prompts và chat history management.
+\end{itemize}
+
+\subsection{Thách thức và giải pháp}
+\begin{table}[H]
+\centering
+\caption{Thách thức và giải pháp}
+\begin{tabularx}{\textwidth}{L{4cm}Y}
+\toprule
+\textbf{Thách thức} & \textbf{Giải pháp} \\
+\midrule
+Hiệu năng với 84.000 segments & Viewport-based loading chỉ tải segments trong bounding box. Zoom-aware detail: ít segments hơn ở zoom thấp. Spatial grid indexing cho O(n) matching. \\[6pt]
+Dự đoán cho route dài & Sampling-based route coverage thay vì midpoint matching. Dynamic segment cap theo độ dài route ($<$3km: 48, 3--10km: 120, $>$10km: 240). Coverage-aware analysis với confidence level. \\[6pt]
+Độ chính xác dự báo với dữ liệu hạn chế & Kết hợp XGBoost prediction + TomTom real-time adjustment. Heuristic fallback cho segments không có ML data. Historical statistics precomputation. \\[6pt]
+Chat tiếng Việt tự nhiên & Rule-based intent detection + LLM enhancement. Context injection từ UI state vào chat prompt. Action system cho phép chat điều khiển bản đồ. \\[6pt]
+Tích hợp nhiều external API & BFF pattern với Next.js API routes làm trung gian. Caching layer (30s cho route, 90s cho real-time, 5min cho predictions). Graceful fallback khi API unavailable. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+%% ============================================================
+%% PHẦN IV: KẾT QUẢ
+%% ============================================================
+\section{KẾT QUẢ}
+
+\subsection{Các tính năng chính}
+Sau quá trình phát triển, SmartRoute đã hoàn thiện đầy đủ các tính năng sau:
+
+\begin{table}[H]
+\centering
+\caption{Danh sách tính năng chính}
+\begin{tabularx}{\textwidth}{p{0.6cm}L{3.2cm}L{2cm}Y}
+\toprule
+\textbf{STT} & \textbf{Tính năng} & \textbf{Trạng thái} & \textbf{Mô tả} \\
+\midrule
+1 & Bản đồ giao thông tương tác & Hoàn thành & MapLibre GL với 84.000 segments, viewport loading, LOS coloring A--F \\[4pt]
+2 & Dự đoán AI (XGBoost) & Hoàn thành & 23 features, accuracy 97,78\%, predict cho +15/+30/+60 phút \\[4pt]
+3 & Dữ liệu thời gian thực & Hoàn thành & TomTom Traffic API, 90s cache, realtime LOS adjustment \\[4pt]
+4 & Tìm kiếm địa điểm & Hoàn thành & Photon geocoding + nhập tọa độ trực tiếp \\[4pt]
+5 & Tìm đường (Routing) & Hoàn thành & GraphHopper API, ETA, quãng đường, bước chỉ đường \\[4pt]
+6 & Phân tích ùn tắc dọc tuyến & Hoàn thành & Congestion score, risk level, coverage, sampling-based \\[4pt]
+7 & Gợi ý thời điểm xuất phát & Hoàn thành & 4 mốc (0/15/30/60 phút), scoring, trade-off explanation \\[4pt]
+8 & Lộ trình thay thế & Hoàn thành & 1--3 alternatives, ranking, label, so sánh metrics \\[4pt]
+9 & Trợ lý AI Chatbot & Hoàn thành & 8 intents tiếng Việt, LLM enhancement, action system \\[4pt]
+10 & Giao diện responsive & Hoàn thành & Desktop + mobile, collapsible panels, touch-friendly \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Đánh giá mức độ đáp ứng}
+SmartRoute đã đáp ứng đầy đủ các yêu cầu đã đề ra ở phần phân tích yêu cầu. Cả 10 yêu cầu chức năng đều đã được triển khai hoàn chỉnh trong source code. Hệ thống có khả năng vận hành thực tế: chạy được local và deploy được lên cloud (Vercel cho frontend, Render/Docker cho backend).
+
+\textbf{Một số metric đáng chú ý:}
+\begin{itemize}[leftmargin=1.2cm]
+    \item XGBoost model accuracy: 97,78\% trên test set.
+    \item Số road segments: 84.000 đoạn đường TP. Hồ Chí Minh.
+    \item Số nodes: 577.000 điểm giao lộ.
+    \item Training data: 33.441 traffic observations.
+    \item Prediction features: 23 engineered features từ 5 nhóm.
+    \item API response time: $<$ 200ms cho batch prediction ($<$ 1000 segments).
+    \item Real-time cache: 90 giây TTL cho TomTom data.
+\end{itemize}
+
+\subsection{Điểm mạnh và điểm yếu}
+
+\subsubsection{Điểm mạnh}
+\begin{itemize}[leftmargin=1.2cm]
+    \item Kiến trúc rõ ràng, multi-tier với separation of concerns: Frontend (Next.js) + BFF (API Routes) + Backend (FastAPI) + External Services.
+    \item AI thật: Mô hình XGBoost được huấn luyện trên dữ liệu thực, đạt accuracy 97,78\%, không phải placeholder hay mock.
+    \item Tính năng phong phú: Từ bản đồ $\rightarrow$ routing $\rightarrow$ prediction $\rightarrow$ departure recommendation $\rightarrow$ alternative routes $\rightarrow$ chatbot -- tạo thành một pipeline hoàn chỉnh.
+    \item Dữ liệu thực: Road segments và traffic history từ Sở GTVT TP. Hồ Chí Minh, không phải dữ liệu giả.
+    \item Real-time integration: TomTom Traffic API cung cấp dữ liệu giao thông thời gian thực.
+    \item UX tiếng Việt: Chatbot hỗ trợ tiếng Việt, giao diện thân thiện.
+    \item Hiệu năng tốt: Viewport-based loading, caching ở nhiều tầng, spatial indexing.
+\end{itemize}
+
+\subsubsection{Điểm yếu}
+\begin{itemize}[leftmargin=1.2cm]
+    \item Dữ liệu lịch sử chỉ bao gồm giai đoạn 07/2020--04/2021, chưa cập nhật. Cần thu thập dữ liệu mới hơn để cải thiện độ chính xác.
+    \item TomTom API miễn phí có giới hạn request. Cần enterprise plan cho production.
+    \item Chưa có hệ thống auth/user management. Cần bổ sung cho production deployment.
+    \item SQLite phù hợp cho PoC nhưng cần migrate sang PostgreSQL/PostGIS cho production với nhiều concurrent users.
+    \item Chat intent detection hiện là rule-based. Có thể cải thiện bằng ML-based NLU.
+\end{itemize}
+
+%% ============================================================
+%% PHẦN V: KẾT LUẬN
+%% ============================================================
+\section{KẾT LUẬN}
+
+\subsection{Tổng kết}
+SmartRoute là một nền tảng web bản đồ giao thông thông minh cho TP. Hồ Chí Minh, được phát triển bởi đội Underrated trong khuôn khổ cuộc thi WebDev Adventure 2026. Dự án kết hợp trí tuệ nhân tạo (XGBoost), dữ liệu giao thông thời gian thực (TomTom), và trợ lý AI (OpenRouter LLM) để cung cấp giải pháp dự báo giao thông ngắn hạn và hỗ trợ quyết định di chuyển.
+
+Quá trình phát triển trải qua 5 phase: từ nền tảng bản đồ cơ bản đến hệ thống hoàn chỉnh với AI prediction, departure recommendation, alternative routes, và chatbot tiếng Việt. Mỗi phase đều giải quyết một bài toán cụ thể và đóng góp vào trải nghiệm tổng thể của người dùng.
+
+\subsection{Khả năng ứng dụng}
+SmartRoute có tiềm năng ứng dụng thực tế cao trong nhiều bối cảnh:
+\begin{itemize}[leftmargin=1.2cm]
+    \item \textbf{Người dùng cá nhân (B2C):} Sinh viên, nhân viên văn phòng tại TP. Hồ Chí Minh cần dự báo giao thông để lên kế hoạch di chuyển.
+    \item \textbf{Doanh nghiệp giao hàng (B2B):} Logistics, food delivery, ride-hailing cần tối ưu lộ trình dựa trên dự báo ùn tắc để giảm chi phí và tăng SLA.
+    \item \textbf{Cơ quan quản lý (B2G):} Sở GTVT, CSGT cần dữ liệu phân tích giao thông theo khu vực và thời gian.
+\end{itemize}
+
+\subsection{Hướng phát triển}
+Các hướng phát triển tiếp theo cho SmartRoute:
+\begin{itemize}[leftmargin=1.2cm]
+    \item Mở rộng dữ liệu: Thu thập dữ liệu giao thông mới hơn, bổ sung dữ liệu thời tiết, sự kiện.
+    \item Nâng cấp ML: Thử nghiệm LSTM cho time-series forecasting, thu thập thêm dữ liệu training.
+    \item Self-hosted services: Valhalla routing, Pelias geocoding, vector tiles từ OSM data.
+    \item Mobile app: Phát triển native mobile app với React Native hoặc Flutter.
+    \item User accounts: Lưu lịch sử route, preferred routes, personalized commute alerts.
+    \item Push notifications: Cảnh báo chủ động khi phát hiện nguy cơ kẹt xe trên lộ trình quen.
+    \item PostgreSQL/PostGIS: Migrate từ SQLite sang PostgreSQL với PostGIS cho spatial queries mạnh mẽ hơn.
+    \item WebSocket: Real-time traffic updates thay vì polling.
+\end{itemize}
+
+%% ============================================================
+%% PHẦN VI: PHÂN CÔNG NHIỆM VỤ
+%% ============================================================
+\section{PHÂN CÔNG NHIỆM VỤ}
+
+Đội Underrated phát triển theo mô hình cùng làm, có trọng tâm riêng. Mọi thành viên đều tham gia vào thiết kế, code review và testing.
+
+\begin{table}[H]
+\centering
+\caption{Phân công nhiệm vụ}
+\begin{tabularx}{\textwidth}{p{0.8cm}L{3.5cm}Y}
+\toprule
+\textbf{STT} & \textbf{Thành viên} & \textbf{Vai trò chính} \\
+\midrule
+1 & Nguyễn Ngọc Phúc & Backend (FastAPI, XGBoost, Database), DevOps \\[6pt]
+2 & Nguyễn Nguyên Anh & Frontend (Next.js, React, MapLibre, UI/UX, Chat), System Architecture \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+%% ============================================================
+%% PHẦN VII: TÀI LIỆU THAM KHẢO
+%% ============================================================
+\section{TÀI LIỆU THAM KHẢO}
+
+\begin{thebibliography}{99}
+\bibitem{so_gtvgt}
+Sở Giao thông Vận tải TP. Hồ Chí Minh, ``HCM Traffic Data 2025,'' data.veronlabs.com, 2025.
+
+\bibitem{xgboost}
+T. Chen and C. Guestrin, ``XGBoost: A Scalable Tree Boosting System,'' in Proc. 22nd ACM SIGKDD Int. Conf. Knowledge Discovery and Data Mining, 2016, pp. 785--794.
+
+\bibitem{sklearn}
+F. Pedregosa et al., ``Scikit-learn: Machine Learning in Python,'' J. Machine Learning Research, vol. 12, pp. 2825--2830, 2011.
+
+\bibitem{graphhopper}
+S. B. K. Inc., ``GraphHopper Routing API,'' graphhopper.com, 2025.
+
+\bibitem{photon}
+Komoot GmbH, ``Photon Geocoding API,'' photon.komoot.io, 2025.
+
+\bibitem{tomtom}
+TomTom International BV, ``TomTom Traffic API,'' developer.tomtom.com, 2025.
+
+\bibitem{openrouter}
+OpenRouter Inc., ``OpenRouter API,'' openrouter.ai, 2025.
+
+\bibitem{nextjs}
+Vercel Inc., ``Next.js Documentation,'' nextjs.org/docs, 2025.
+
+\bibitem{fastapi}
+Sebastián Ramírez, ``FastAPI Documentation,'' fastapi.tiangolo.com, 2025.
+
+\bibitem{maplibre}
+MapLibre Org, ``MapLibre GL JS Documentation,'' maplibre.org, 2025.
+
+\bibitem{osm}
+OpenStreetMap Foundation, ``OpenStreetMap,'' openstreetmap.org, 2025.
+
+\bibitem{pytorch}
+A. Paszke et al., ``PyTorch: An Imperative Style, High-Performance Deep Learning Library,'' in Advances in Neural Information Processing Systems 32, 2019.
+
+\end{thebibliography}
+
+%% ============================================================
+%% PHỤ LỤC
+%% ============================================================
+\clearpage
+\appendix
+\section*{PHỤ LỤC}
+\addcontentsline{toc}{section}{Phụ lục}
+
+\subsection*{A. Mã nguồn}
+Source code: \url{https://github.com/phucnn-dhl/SmartRoute}
+
+\subsection*{B. Link Deploy}
+\begin{table}[H]
+\centering
+\begin{tabularx}{0.8\textwidth}{L{2.5cm}L{5cm}L{2cm}}
+\toprule
+\textbf{Dịch vụ} & \textbf{URL} & \textbf{Nền tảng} \\
+\midrule
+Frontend & \url{https://smartroute-poc.vercel.app} & Vercel \\
+Backend API & \url{https://traffic-api.onrender.com} & Render \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection*{C. Hướng dẫn cài đặt và chạy local}
+
+\textbf{Backend:}
+\begin{lstlisting}
+cd traffic-api
+pip install -r requirements.txt
+python scripts/seed_db.py
+python scripts/train_model.py
+uvicorn main:app --reload --port 8000
+\end{lstlisting}
+
+\textbf{Frontend:}
+\begin{lstlisting}
+cd traffic-map-poc
+npm install
+# Set GRAPHHOPPER_API_KEY in .env.local
+npm run dev
+\end{lstlisting}
+
+Mở \url{http://localhost:3000} trên trình duyệt.
+
+\subsection*{D. API Documentation}
+\begin{itemize}[leftmargin=1.2cm]
+    \item Backend Swagger UI: \url{http://localhost:8000/docs} (khi chạy local)
+    \item Backend ReDoc: \url{http://localhost:8000/redoc} (khi chạy local)
+\end{itemize}
+
+\subsection*{E. XGBoost Model Parameters}
+\begin{table}[H]
+\centering
+\begin{tabularx}{0.6\textwidth}{L{4cm}L{3cm}}
+\toprule
+\textbf{Parameter} & \textbf{Value} \\
+\midrule
+max\_depth & 8 \\
+learning\_rate & 0.1 \\
+n\_estimators & 300 \\
+objective & multi:softprob \\
+num\_class & 6 \\
+eval\_metric & mlogloss \\
+early\_stopping\_rounds & 20 \\
+Train split & $\leq$ 31/03/2021 \\
+Validation split & 01/04 -- 14/04/2021 \\
+Test split & $\geq$ 15/04/2021 \\
+Accuracy (test) & 97.78\% \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\end{document}
