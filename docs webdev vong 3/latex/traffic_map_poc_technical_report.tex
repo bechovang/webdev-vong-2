@@ -233,12 +233,13 @@ SmartRoute sử dụng kiến trúc multi-tier với Frontend (Next.js) đóng v
 
 \begin{figure}[H]
 \centering
+
 \begin{tikzpicture}[
-    ui/.style={draw, rounded corners, align=center, minimum width=3.8cm, minimum height=1cm, fill=blue!8},
-    api/.style={draw, rounded corners, align=center, minimum width=3.8cm, minimum height=1cm, fill=green!8},
+    ui/.style={draw, rounded corners, align=center, minimum width=4cm, minimum height=1cm, fill=blue!8},
+    api/.style={draw, rounded corners, align=center, minimum width=4cm, minimum height=1cm, fill=green!8},
     ext/.style={draw, rounded corners, align=center, minimum width=3.8cm, minimum height=1cm, fill=orange!10},
-    data/.style={draw, rounded corners, align=center, minimum width=3.8cm, minimum height=1cm, fill=gray!12},
-    ml/.style={draw, rounded corners, align=center, minimum width=3.8cm, minimum height=1cm, fill=purple!10},
+    data/.style={draw, rounded corners, align=center, minimum width=4.2cm, minimum height=1cm, fill=gray!12},
+    ml/.style={draw, rounded corners, align=center, minimum width=4cm, minimum height=1cm, fill=purple!10},
     arrow/.style={-{Latex[length=2.5mm]}, thick}
 ]
 
@@ -246,16 +247,16 @@ SmartRoute sử dụng kiến trúc multi-tier với Frontend (Next.js) đóng v
 \node[ui] at (0, 0) (user) {Người dùng\\Browser};
 
 % Row 2 - Frontend
-\node[ui] at (0, -2) (fe) {Next.js Client UI\\MapView, SearchBox, RouteLayer, Chat};
+\node[ui, minimum width=7cm] at (0, -2) (fe) {Next.js Client UI\\MapView, SearchBox, RouteLayer, Chat};
 
 % Row 3 - BFF Layer
-\node[api] at (-4, -4.2) (bff1) {BFF API Routes\\\texttt{/api/segments-hcmc}};
-\node[api] at (4, -4.2) (bff2) {BFF API Routes\\\texttt{/api/route, /api/chat}};
+\node[api] at (-4.5, -4.2) (bff1) {BFF API Routes\\\texttt{/api/segments-hcmc}};
+\node[api] at (4.5, -4.2) (bff2) {BFF API Routes\\\texttt{/api/route, /api/chat}};
 
-% Row 4 - Backend
-\node[ml] at (-4, -6.4) (fastapi) {FastAPI Backend\\XGBoost Prediction};
+% Row 4 - Backend (tăng khoảng cách x)
+\node[ml] at (-5.5, -6.4) (fastapi) {FastAPI Backend\\XGBoost Prediction};
 \node[data] at (0, -6.4) (db) {SQLite Database\\84k segments, 577k nodes};
-\node[api] at (4, -6.4) (bff3) {BFF Route Alt.\\\texttt{/api/route/alternatives}};
+\node[api] at (5.5, -6.4) (bff3) {BFF Route Alt.\\\texttt{/api/route/alternatives}};
 
 % Row 5 - External
 \node[ext] at (-5.5, -8.6) (gh) {GraphHopper API\\Routing};
@@ -276,6 +277,7 @@ SmartRoute sử dụng kiến trúc multi-tier với Frontend (Next.js) đóng v
 \draw[arrow] (fe) -- (bff3);
 
 \end{tikzpicture}
+
 \caption{Kiến trúc multi-tier của SmartRoute}
 \label{fig:architecture}
 \end{figure}
