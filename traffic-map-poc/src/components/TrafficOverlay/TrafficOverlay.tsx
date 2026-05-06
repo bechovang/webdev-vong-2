@@ -28,12 +28,12 @@ const LOS_COLORS = {
 };
 
 const LOS_LABELS = {
-  A: 'Thong thoang',
-  B: 'Kha tot',
-  C: 'On dinh',
-  D: 'Bat dau ket',
-  E: 'Ket xe',
-  F: 'Ket cung',
+  A: 'Thông thoáng',
+  B: 'Khá tốt',
+  C: 'Ổn định',
+  D: 'Bắt đầu kẹt',
+  E: 'Kẹt xe',
+  F: 'Kẹt cứng',
 };
 
 export interface TrafficSegment {
@@ -843,11 +843,11 @@ function buildSegmentPopupHtml(props: SegmentFeatureProperties) {
         <div style="font-size: 14px; font-weight: 600;">${props.label}</div>
       </div>
       <div style="font-size: 12px; color: #4b5563; line-height: 1.6;">
-        <div>Confidence: ${(props.confidence * 100).toFixed(0)}%</div>
-        <div>Source: ${sourceLabel}</div>
-        <div>Street level: ${props.street_level}</div>
-        <div>Speed limit: ${props.max_velocity} km/h</div>
-        <div>Length: ${Math.round(props.length)} m</div>
+        <div>Độ tin cậy: ${(props.confidence * 100).toFixed(0)}%</div>
+        <div>Nguồn: ${sourceLabel}</div>
+        <div>Cấp đường: ${props.street_level}</div>
+        <div>Giới hạn tốc độ: ${props.max_velocity} km/h</div>
+        <div>Chiều dài: ${Math.round(props.length)} m</div>
       </div>
       ${realtimeSection}
     </div>
@@ -863,10 +863,10 @@ function buildHotspotPopupHtml(props: HotspotFeatureProperties) {
         ${getHotspotSeverityLabel(props.severity)}
       </div>
       <div style="font-size: 12px; color: #4b5563; line-height: 1.7;">
-        <div>Radius: ${Math.round(props.radius_meters)} m</div>
-        <div>Speed / free flow: ${(props.speed_ratio * 100).toFixed(0)}%</div>
-        <div>Delay ratio: ${props.delay_ratio.toFixed(2)}x</div>
-        <div>Road closure: ${props.road_closure ? 'Yes' : 'No'}</div>
+        <div>Bán kính: ${Math.round(props.radius_meters)} m</div>
+        <div>Tốc độ / lưu thông tự do: ${(props.speed_ratio * 100).toFixed(0)}%</div>
+        <div>Tỷ lệ chậm trễ: ${props.delay_ratio.toFixed(2)}x</div>
+        <div>Đóng đường: ${props.road_closure ? 'Có' : 'Không'}</div>
       </div>
     </div>
   `;
@@ -994,10 +994,10 @@ function buildCircleRing(lat: number, lng: number, radiusMeters: number): [numbe
 }
 
 function getHotspotSeverityLabel(severity: number) {
-  if (severity >= 6) return 'Critical hotspot';
-  if (severity >= 4) return 'Heavy realtime congestion';
-  if (severity >= 2) return 'Moderate hotspot';
-  return 'Monitoring hotspot';
+  if (severity >= 6) return 'Điểm nóng nghiêm trọng';
+  if (severity >= 4) return 'Ùn tắc realtime cao';
+  if (severity >= 2) return 'Điểm nóng mức vừa';
+  return 'Điểm nóng đang theo dõi';
 }
 
 function getFallbackHotspots(): TrafficHotspot[] {
@@ -1008,7 +1008,7 @@ function getFallbackHotspots(): TrafficHotspot[] {
       lat: 10.8012,
       lng: 106.6528,
       radius_meters: 260,
-      description: 'Fallback hotspot',
+      description: 'Điểm nóng dự phòng',
       realtime: {
         current_speed: 18,
         free_flow_speed: 32,
@@ -1027,7 +1027,7 @@ function getFallbackHotspots(): TrafficHotspot[] {
       lat: 10.7941,
       lng: 106.7219,
       radius_meters: 320,
-      description: 'Fallback hotspot',
+      description: 'Điểm nóng dự phòng',
       realtime: {
         current_speed: 24,
         free_flow_speed: 38,
@@ -1046,7 +1046,7 @@ function getFallbackHotspots(): TrafficHotspot[] {
       lat: 10.7643,
       lng: 106.7054,
       radius_meters: 280,
-      description: 'Fallback hotspot',
+      description: 'Điểm nóng dự phòng',
       realtime: {
         current_speed: 31,
         free_flow_speed: 42,
@@ -1079,7 +1079,7 @@ const LOSLegend: React.FC<{ isPrediction?: boolean }> = ({ isPrediction = false 
       }}
     >
       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
-        {isPrediction ? 'LOS du bao' : 'LOS hien tai'}
+        {isPrediction ? 'LOS dự báo' : 'LOS hiện tại'}
       </div>
 
       {Object.entries(LOS_COLORS).map(([los, color]) => (
@@ -1111,12 +1111,12 @@ const LOSLegend: React.FC<{ isPrediction?: boolean }> = ({ isPrediction = false 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
           <div style={{ width: 24, height: 8, borderRadius: 999, background: '#7c3aed', boxShadow: '0 0 12px rgba(124,58,237,0.55)' }} />
           <span>
-            <strong style={{ color: '#7c3aed' }}>Realtime</strong> - segment bi API realtime dieu chinh
+            <strong style={{ color: '#7c3aed' }}>Realtime</strong> - đoạn đường bị API realtime điều chỉnh
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#f97316', boxShadow: '0 0 0 6px rgba(249,115,22,0.18)' }} />
-          <span>Hotspot dam mau hon khi severity cao</span>
+          <span>Hotspot đậm màu hơn khi mức độ nghiêm trọng cao</span>
         </div>
       </div>
     </div>
@@ -1130,8 +1130,8 @@ const StatsPanel: React.FC<{
   const getTimeLabel = () => {
     if (timeSelection.type === 'preset') {
       const horizon = timeSelection.horizon || 'now';
-      if (horizon === 'now') return 'Hien tai';
-      return `+${horizon.slice(1)} phut`;
+      if (horizon === 'now') return 'Hiện tại';
+      return `+${horizon.slice(1)} phút`;
     }
 
     return timeSelection.customTime?.toLocaleTimeString('vi-VN', {
@@ -1155,22 +1155,22 @@ const StatsPanel: React.FC<{
         minWidth: 240,
       }}
     >
-      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 14 }}>Thong ke giao thong</div>
+      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 14 }}>Thống kê giao thông</div>
 
       <div style={{ padding: '12px', background: '#f8f9fa', borderRadius: 10, marginBottom: 14 }}>
-        <div style={{ fontSize: 12, color: '#666', marginBottom: 6, fontWeight: 500 }}>Thoi gian</div>
+        <div style={{ fontSize: 12, color: '#666', marginBottom: 6, fontWeight: 500 }}>Thời gian</div>
         <div style={{ fontSize: 18, fontWeight: 700, color: '#1f2937' }}>{getTimeLabel()}</div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
         <div>
-          <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Doan duong hien thi</div>
+          <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Đoạn đường hiển thị</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: '#1976d2' }}>
             {stats.total.toLocaleString()}
           </div>
         </div>
         <div>
-          <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Dang ket</div>
+          <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Đang kẹt</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: '#ef4444' }}>
             {stats.congested.toLocaleString()}
           </div>
@@ -1178,17 +1178,17 @@ const StatsPanel: React.FC<{
       </div>
 
       <div style={{ fontSize: 12, color: '#666', marginBottom: 10 }}>
-        Ty le ket xe: <strong>{stats.congestedPercent}%</strong>
+        Tỷ lệ kẹt xe: <strong>{stats.congestedPercent}%</strong>
       </div>
 
       {stats.realtimeAdjusted > 0 && (
         <div style={{ padding: '8px 12px', background: '#f0e6ff', borderRadius: 8, marginBottom: 14, borderLeft: '3px solid #7c3aed' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#7c3aed', marginBottom: 4 }}>Realtime Adjustment</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#7c3aed', marginBottom: 4 }}>Điều chỉnh realtime</div>
           <div style={{ fontSize: 12, color: '#4b5563' }}>
-            Segments adjusted: <strong>{stats.realtimeAdjusted}</strong>
+            Đoạn đường được điều chỉnh: <strong>{stats.realtimeAdjusted}</strong>
           </div>
           <div style={{ fontSize: 12, color: '#4b5563' }}>
-            Hotspots active: <strong>{stats.realtimeHotspotCount}</strong>
+            Hotspot đang hoạt động: <strong>{stats.realtimeHotspotCount}</strong>
             {stats.realtimeHotspots.length > 0 && (
               <span style={{ fontSize: 11, color: '#9ca3af' }}> ({stats.realtimeHotspots.join(', ')})</span>
             )}
@@ -1237,8 +1237,8 @@ const MobileTrafficOverlay: React.FC<{
   const getTimeLabel = () => {
     if (timeSelection.type === 'preset') {
       const horizon = timeSelection.horizon || 'now';
-      if (horizon === 'now') return 'Hien tai';
-      return `+${horizon.slice(1)} phut`;
+      if (horizon === 'now') return 'Hiện tại';
+      return `+${horizon.slice(1)} phút`;
     }
     return timeSelection.customTime?.toLocaleTimeString('vi-VN', {
       hour: '2-digit',
@@ -1291,7 +1291,7 @@ const MobileTrafficOverlay: React.FC<{
           }}
         >
           <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>
-            {isPrediction ? 'LOS du bao' : 'LOS hien tai'}
+            {isPrediction ? 'LOS dự báo' : 'LOS hiện tại'}
           </div>
 
           {Object.entries(LOS_COLORS).map(([los, color]) => (
@@ -1305,33 +1305,33 @@ const MobileTrafficOverlay: React.FC<{
 
           <div style={{ borderTop: '1px solid #e5e7eb', margin: '10px 0' }} />
 
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Thong ke giao thong</div>
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Thống kê giao thông</div>
           <div style={{ padding: '10px', background: '#f8f9fa', borderRadius: 10, marginBottom: 10 }}>
-            <div style={{ fontSize: 12, color: '#666', marginBottom: 4, fontWeight: 500 }}>Thoi gian</div>
+            <div style={{ fontSize: 12, color: '#666', marginBottom: 4, fontWeight: 500 }}>Thời gian</div>
             <div style={{ fontSize: 16, fontWeight: 700, color: '#1f2937' }}>{getTimeLabel()}</div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
             <div>
-              <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Doan duong hien thi</div>
+              <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Đoạn đường hiển thị</div>
               <div style={{ fontSize: 20, fontWeight: 700, color: '#1976d2' }}>{stats.total.toLocaleString()}</div>
             </div>
             <div>
-              <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Dang ket</div>
+              <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Đang kẹt</div>
               <div style={{ fontSize: 20, fontWeight: 700, color: '#ef4444' }}>{stats.congested.toLocaleString()}</div>
             </div>
           </div>
           <div style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
-            Ty le ket xe: <strong>{stats.congestedPercent}%</strong>
+            Tỷ lệ kẹt xe: <strong>{stats.congestedPercent}%</strong>
           </div>
 
           {stats.realtimeAdjusted > 0 && (
             <div style={{ padding: '10px 12px', background: '#f0e6ff', borderRadius: 10, marginBottom: 10, borderLeft: '3px solid #7c3aed' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', marginBottom: 4 }}>Realtime Adjustment</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', marginBottom: 4 }}>Điều chỉnh realtime</div>
               <div style={{ fontSize: 12, color: '#4b5563', marginBottom: 2 }}>
-                Segments adjusted: <strong>{stats.realtimeAdjusted}</strong>
+                Đoạn đường được điều chỉnh: <strong>{stats.realtimeAdjusted}</strong>
               </div>
               <div style={{ fontSize: 12, color: '#4b5563' }}>
-                Active hotspots: <strong>{activeHotspots.length}</strong>
+                Hotspot đang hoạt động: <strong>{activeHotspots.length}</strong>
               </div>
             </div>
           )}
@@ -1353,7 +1353,7 @@ const MobileTrafficOverlay: React.FC<{
           {activeHotspots.length > 0 && (
             <>
               <div style={{ borderTop: '1px solid #e5e7eb', margin: '10px 0' }} />
-              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Hotspots in view</div>
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Hotspot trong tầm nhìn</div>
               {activeHotspots.slice(0, 4).map((hotspot) => (
                 <div
                   key={hotspot.id}
@@ -1369,7 +1369,7 @@ const MobileTrafficOverlay: React.FC<{
                     {hotspot.name}
                   </div>
                   <div style={{ fontSize: 11, color: '#7c2d12' }}>
-                    Severity {hotspot.realtime?.severity || 0} · Speed {(100 * (hotspot.realtime?.speed_ratio || 1)).toFixed(0)}%
+                    Mức độ {hotspot.realtime?.severity || 0} · Tốc độ {(100 * (hotspot.realtime?.speed_ratio || 1)).toFixed(0)}%
                   </div>
                 </div>
               ))}
