@@ -206,8 +206,7 @@ Dựa trên bài toán đã xác định, các yêu cầu chức năng chính đ
 6 & Gợi ý thời điểm xuất phát & So sánh 4 mốc (0/15/30/60 phút), chấm điểm duration + congestion + risk, đề xuất thời điểm tốt nhất & Trung bình \\[4pt]
 7 & Lộ trình thay thế & Đề xuất 2--3 route alternatives, xếp hạng theo traffic prediction, hiển thị trade-off & Trung bình \\[4pt]
 8 & Trợ lý AI chatbot & Chat tiếng Việt, nhận diện intent, điều khiển bản đồ (set route, set time), LLM enhancement & Trung bình \\[4pt]
-9 & Dữ liệu thời gian thực & Tích hợp TomTom Traffic API, điều chỉnh dự báo XGBoost bằng dữ liệu real-time & Trung bình \\[4pt]
-10 & Giao diện responsive & Hỗ trợ cả desktop và mobile, panel thu gọn, touch-friendly & Cao \\
+9 & Dữ liệu thời gian thực & Tích hợp TomTom Traffic API, điều chỉnh dự báo XGBoost bằng dữ liệu real-time & Trung bình \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -508,8 +507,7 @@ Sau quá trình phát triển, SmartRoute đã hoàn thiện đầy đủ các t
 6 & Phân tích ùn tắc dọc tuyến & Hoàn thành & Congestion score, risk level, coverage, sampling-based \\[4pt]
 7 & Gợi ý thời điểm xuất phát & Hoàn thành & 4 mốc (0/15/30/60 phút), scoring, trade-off explanation \\[4pt]
 8 & Lộ trình thay thế & Hoàn thành & 1--3 alternatives, ranking, label, so sánh metrics \\[4pt]
-9 & Trợ lý AI Chatbot & Hoàn thành & 8 intents tiếng Việt, LLM enhancement, action system \\[4pt]
-10 & Giao diện responsive & Hoàn thành & Desktop + mobile, collapsible panels, touch-friendly \\
+9 & Trợ lý AI Chatbot & Hoàn thành & 8 intents tiếng Việt, LLM enhancement, action system \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -535,7 +533,6 @@ SmartRoute đã đáp ứng đầy đủ các yêu cầu đã đề ra ở phầ
     \item Kiến trúc rõ ràng, multi-tier với separation of concerns: Frontend (Next.js) + BFF (API Routes) + Backend (FastAPI) + External Services.
     \item AI thật: Mô hình XGBoost được huấn luyện trên dữ liệu thực, đạt accuracy 97,78\%, không phải placeholder hay mock.
     \item Tính năng phong phú: Từ bản đồ $\rightarrow$ routing $\rightarrow$ prediction $\rightarrow$ departure recommendation $\rightarrow$ alternative routes $\rightarrow$ chatbot -- tạo thành một pipeline hoàn chỉnh.
-    \item Dữ liệu thực: Road segments và traffic history từ Sở GTVT TP. Hồ Chí Minh, không phải dữ liệu giả.
     \item Real-time integration: TomTom Traffic API cung cấp dữ liệu giao thông thời gian thực.
     \item UX tiếng Việt: Chatbot hỗ trợ tiếng Việt, giao diện thân thiện.
     \item Hiệu năng tốt: Viewport-based loading, caching ở nhiều tầng, spatial indexing.
@@ -561,25 +558,124 @@ SmartRoute là một nền tảng web bản đồ giao thông thông minh cho TP
 Quá trình phát triển trải qua 5 phase: từ nền tảng bản đồ cơ bản đến hệ thống hoàn chỉnh với AI prediction, departure recommendation, alternative routes, và chatbot tiếng Việt. Mỗi phase đều giải quyết một bài toán cụ thể và đóng góp vào trải nghiệm tổng thể của người dùng.
 
 \subsection{Khả năng ứng dụng}
-SmartRoute có tiềm năng ứng dụng thực tế cao trong nhiều bối cảnh:
+
+SmartRoute không định vị là ``một app bản đồ cạnh tranh trực tiếp Google Maps'', mà là \textbf{nền tảng dự báo giao thông ngắn hạn và hỗ trợ quyết định di chuyển}, tập trung vào các tình huống mà bản đồ phổ thông chưa cá nhân hóa đủ sâu. Điểm khác biệt nằm ở chữ \textit{``dự báo''} và \textit{``chủ động''} -- không chỉ ``đang kẹt'', mà là ``30 phút nữa có khả năng kẹt không'' và ``nên đi ngay hay chờ 15 phút''.
+
+\subsubsection{Người dùng cá nhân (B2C) -- Trợ lý di chuyển hằng ngày}
+Google Maps thường được mở khi người dùng \textbf{không biết đường}. Nhưng phần lớn chuyến đi hằng ngày là tuyến quen thuộc: đi học, đi làm, đi ăn, giao hàng. Với những tuyến này, người dùng đã biết đường; điều họ cần là \textbf{biết trước tình trạng giao thông và thời điểm xuất phát tối ưu}. Vì vậy SmartRoute có cơ hội trở thành ứng dụng được mở \textbf{mỗi ngày}, trước mỗi sự kiện di chuyển.
+
+Các nhóm người dùng chính:
 \begin{itemize}[leftmargin=1.2cm]
-    \item \textbf{Người dùng cá nhân (B2C):} Sinh viên, nhân viên văn phòng tại TP. Hồ Chí Minh cần dự báo giao thông để lên kế hoạch di chuyển.
-    \item \textbf{Doanh nghiệp giao hàng (B2B):} Logistics, food delivery, ride-hailing cần tối ưu lộ trình dựa trên dự báo ùn tắc để giảm chi phí và tăng SLA.
-    \item \textbf{Cơ quan quản lý (B2G):} Sở GTVT, CSGT cần dữ liệu phân tích giao thông theo khu vực và thời gian.
+    \item \textbf{Sinh viên, nhân viên văn phòng:} Cần dự báo tuyến quen thuộc (nhà $\rightarrow$ trường, nhà $\rightarrow$ công ty), nhận nhắc giờ xuất phát, cảnh báo kẹt xe trước giờ cao điểm.
+    \item \textbf{Tài xế công nghệ, shipper:} Mỗi phút kẹt xe ảnh hưởng trực tiếp đến số đơn hoàn thành, SLA, nhiên liệu và thu nhập.
+    \item \textbf{Nhóm bạn, cộng đồng:} Qua tính năng Smart Meet -- một lớp social mobility giúp nhóm người tổ chức cuộc hẹn: một người tạo kèo (địa điểm, giờ hẹn), app tạo link mời, ai tham gia thì xác nhận, app tự động tính khoảng cách và tình trạng giao thông của từng người, trước giờ hẹn sẽ nhắc từng người nên xuất phát lúc nào, và nhóm có thể xem trạng thái đến nơi của nhau (chưa xuất phát / đang trên đường / sắp tới / có nguy cơ trễ / đã đến).
 \end{itemize}
 
-\subsection{Hướng phát triển}
-Các hướng phát triển tiếp theo cho SmartRoute:
+\subsubsection{Doanh nghiệp giao hàng và logistics (B2B)}
+Đây là hướng business mạnh nhất, vì với logistics, kẹt xe không chỉ gây khó chịu mà gây \textbf{mất tiền thật}: trễ SLA, tốn nhiên liệu, giảm số chuyến/ngày, tăng chi phí tài xế, giảm trải nghiệm khách hàng.
+
+SmartRoute cung cấp:
 \begin{itemize}[leftmargin=1.2cm]
-    \item Mở rộng dữ liệu: Thu thập dữ liệu giao thông mới hơn, bổ sung dữ liệu thời tiết, sự kiện.
-    \item Nâng cấp ML: Thử nghiệm LSTM cho time-series forecasting, thu thập thêm dữ liệu training.
-    \item Self-hosted services: Valhalla routing, Pelias geocoding, vector tiles từ OSM data.
-    \item Mobile app: Phát triển native mobile app với React Native hoặc Flutter.
-    \item User accounts: Lưu lịch sử route, preferred routes, personalized commute alerts.
-    \item Push notifications: Cảnh báo chủ động khi phát hiện nguy cơ kẹt xe trên lộ trình quen.
-    \item PostgreSQL/PostGIS: Migrate từ SQLite sang PostgreSQL với PostGIS cho spatial queries mạnh mẽ hơn.
-    \item WebSocket: Real-time traffic updates thay vì polling.
+    \item API dự báo giao thông ngắn hạn theo khu vực và tuyến đường.
+    \item Dashboard điều phối đội xe với risk scoring và ETA correction.
+    \item Gợi ý thứ tự giao đơn tối ưu dựa trên mật độ giao thông thực tế.
+    \item Cảnh báo đơn có nguy cơ trễ, khu vực sắp kẹt trong 15--60 phút.
+    \item Phân tích lịch sử tuyến đường thường bị delay.
 \end{itemize}
+
+\subsubsection{Trường học và khu công nghiệp}
+Hướng tiếp cận \textbf{micro-market} -- tập trung vào khu vực cụ thể thay vì toàn thành phố:
+\begin{itemize}[leftmargin=1.2cm]
+    \item \textbf{Trường đại học:} Dashboard giao thông quanh cổng, cảnh báo giờ cao điểm, hỗ trợ sinh viên/giảng viên biết tình trạng giao thông trước khi xuất phát.
+    \item \textbf{Khu công nghiệp:} Dự báo mật độ xe ra/vào cổng, hỗ trợ xe tải, container và nhân sự tối ưu giờ di chuyển.
+    \item \textbf{Khu vực có quyền triển khai camera:} Trích xuất dữ liệu mật độ xe, tốc độ trung bình, mức độ ùn tắc từ camera nội bộ mà không cần lưu video cá nhân.
+\end{itemize}
+
+\subsubsection{Cơ quan quản lý đô thị (B2G)}
+Đây là tầm nhìn dài hạn: cung cấp heatmap ùn tắc, dữ liệu phân tích giao thông theo khu vực và thời gian, báo cáo điểm nóng, dữ liệu hỗ trợ quy hoạch phân luồng cho Sở GTVT, CSGT.
+
+\subsubsection{Chiến lược kiếm tiền}
+SmartRoute không đặt subscription cho người dùng cá nhân làm nguồn doanh thu chính. Chiến lược là:
+\begin{itemize}[leftmargin=1.2cm]
+    \item \textbf{B2C miễn phí} để tạo thói quen sử dụng, thu thập dữ liệu và xây dựng mạng lưới cộng đồng.
+    \item \textbf{B2B SaaS/API} cho logistics, trường học, khu công nghiệp -- đây là nguồn doanh thu chính và ổn định nhất.
+    \item \textbf{Smart Meet marketplace:} Booking commission (đặt bàn, book sân, mua vé sự kiện), sponsored places, group deals.
+    \item \textbf{Quảng cáo theo ngữ cảnh di chuyển:} Gợi ý quán ăn, voucher, ưu đãi dựa trên vị trí, thời gian và ý định di chuyển -- không phải banner đại trà.
+    \item \textbf{Partnership:} Hợp tác với Foody, GrabFood, ShopeeFood, địa điểm giải trí, dịch vụ di chuyển.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    box/.style={draw, rounded corners, align=center, minimum width=3.5cm, minimum height=0.9cm, fill=#1},
+    box/.default=blue!8,
+    arrow/.style={-{Latex[length=2.5mm]}, thick}
+]
+\node[box=purple!12] at (0, 0) (ai) {\textbf{AI Prediction Engine}\\XGBoost + TomTom};
+\node[box=blue!10] at (-4.5, -2) (b2c) {\textbf{B2C Assistant}\\Trợ lý di chuyển cá nhân};
+\node[box=green!10] at (4.5, -2) (b2b) {\textbf{B2B Logistics}\\API, Dashboard, Fleet};
+\node[box=orange!10] at (-4.5, -4) (data) {\textbf{Data Network}\\User, Report, GPS};
+\node[box=orange!10] at (0, -4) (meet) {\textbf{Smart Meet}\\Booking, Social};
+\node[box=orange!10] at (4.5, -4) (ads) {\textbf{Ads/Partnership}\\Quảng cáo ngữ cảnh};
+
+\draw[arrow] (ai) -- (b2c);
+\draw[arrow] (ai) -- (b2b);
+\draw[arrow] (b2c) -- (data);
+\draw[arrow] (data) -- (ai) node[midway, left, font=\small] {Cải thiện AI};
+\draw[arrow] (b2c) -- (meet);
+\draw[arrow] (b2b) -- (ads);
+\draw[arrow] (data) -- (b2b);
+\end{tikzpicture}
+\caption{Flywheel kinh doanh của SmartRoute}
+\label{fig:business-flywheel}
+\end{figure}
+
+\subsection{Hướng phát triển}
+
+\subsubsection{Nâng cấp AI dự báo giao thông}
+\begin{itemize}[leftmargin=1.2cm]
+    \item \textbf{AI tối ưu cho giao thông Việt Nam:} Huấn luyện model riêng học các yếu tố đặc thù: mật độ xe máy, giờ vào/tan học, giờ tan ca khu công nghiệp, mưa ngập, chợ, bệnh viện, lô cốt, công trình, hành vi luồn lách của xe máy. Đây là nơi Google khó tối ưu sâu -- SmartRoute thắng bằng \textit{hyperlocal AI}.
+    \item \textbf{AI camera:} Model computer vision đo mật độ và tốc độ trung bình từ camera giao thông: phát hiện loại phương tiện (xe máy, ô tô, xe tải, container), đếm lưu lượng theo hướng, phát hiện ùn ứ bất thường. Chỉ xuất dữ liệu thống kê, không lưu video hay nhận diện cá nhân.
+    \item \textbf{Traffic fusion engine:} AI kết hợp nhiều nguồn dữ liệu (camera, GPS người dùng, report cộng đồng, lịch học/lịch làm, thời tiết, road segments, dữ liệu logistics) và tự đánh trọng số từng nguồn. AI không chỉ dự báo mà còn biết nguồn nào đáng tin hơn.
+    \item \textbf{AI trust score cho report cộng đồng:} Chấm điểm report dựa trên danh tính tổ chức, vị trí GPS, lịch sử đúng/sai, số người xác nhận, xác nhận camera, và pattern lịch sử. Tạo hệ thống ``Waze có trách nhiệm''.
+    \item \textbf{AI học tuyến quen thuộc:} Học thói quen cá nhân (tuyến thường đi, giờ thường đi, phương tiện ưa thích, mức chấp nhận đường vòng) để chủ động nhắc xuất phát: ``Hôm nay tuyến đến trường đông hơn bình thường, nên đi sớm 12 phút.''
+    \item \textbf{LSTM cho time-series forecasting:} Thử nghiệm mô hình deep learning cho dự báo chuỗi thời gian, thu thập thêm dữ liệu training mới hơn giai đoạn 07/2020--04/2021 hiện tại.
+\end{itemize}
+
+\subsubsection{Mở rộng tính năng nền tảng}
+\begin{itemize}[leftmargin=1.2cm]
+    \item \textbf{Smart Meet -- Social mobility layer:} Tạo link hẹn, xác nhận tham gia, vote địa điểm/thời gian, nhắc giờ xuất phát cho từng người, theo dõi trạng thái đến nơi (chưa xuất phát / đang trên đường / sắp tới / có nguy cơ trễ / đã đến). Phát triển thành marketplace booking: đặt bàn, book sân thể thao, book phòng họp, mua vé sự kiện, group deals.
+    \item \textbf{Community traffic reporting:} Verified community reporting theo tổ chức (trường, khu công nghiệp, công ty logistics), ping sự cố (kẹt xe, tai nạn, ngập, công trình, chốt kiểm tra), trust score cho từng report.
+    \item \textbf{Proactive alerts:} Cảnh báo chủ động qua push notification: ``Đường về nhà đang kẹt nặng hơn bình thường'', ``Nếu muốn kịp lớp 7:30, bạn nên đi trong 10 phút nữa.''
+    \item \textbf{Calendar-aware reminder:} Đồng bộ lịch học/lịch làm, tự tính giờ xuất phát tối ưu cho từng sự kiện có yếu tố di chuyển.
+    \item \textbf{User accounts:} Lưu lịch sử route, preferred routes, tuyến quen thuộc, personalized commute alerts, nhóm riêng tư.
+\end{itemize}
+
+\subsubsection{Mở rộng hạ tầng kỹ thuật}
+\begin{itemize}[leftmargin=1.2cm]
+    \item \textbf{Mở rộng dữ liệu:} Thu thập dữ liệu giao thông mới hơn, bổ sung dữ liệu thời tiết, sự kiện, dữ liệu camera nội bộ tại khu vực triển khai.
+    \item \textbf{Self-hosted services:} Valhalla routing, Pelias geocoding, vector tiles từ OSM data -- giảm phụ thuộc external API.
+    \item \textbf{PostgreSQL/PostGIS:} Migrate từ SQLite sang PostgreSQL với PostGIS cho spatial queries mạnh mẽ hơn, hỗ trợ nhiều concurrent users.
+    \item \textbf{WebSocket:} Real-time traffic updates thay vì polling.
+    \item \textbf{Mobile app:} Phát triển native mobile app với React Native hoặc Flutter để tận dụng push notification và GPS background.
+    \item \textbf{Tích hợp camera khu vực:} Triển khai tại cổng trường, cổng khu công nghiệp, bãi xe, tuyến nội khu để trích xuất dữ liệu mật độ và tốc độ trung bình.
+\end{itemize}
+
+\subsubsection{Chiến lược phát triển theo giai đoạn}
+\begin{table}[H]
+\centering
+\caption{Lộ trình phát triển SmartRoute}
+\begin{tabularx}{\textwidth}{L{2.5cm}L{3cm}Y}
+\toprule
+\textbf{Giai đoạn} & \textbf{Trọng tâm} & \textbf{Mục tiêu} \\
+\midrule
+0--3 tháng & Hoàn thiện MVP & AI prediction thật, heatmap + route risk + departure recommendation cho một khu vực cụ thể \\[6pt]
+3--6 tháng & Thu thập feedback & Chạy thử nghiệm tại Thủ Đức/Bình Thạnh/Quận 1, thêm dữ liệu thời tiết/sự kiện, community reporting \\[6pt]
+6--12 tháng & Thử nghiệm B2B & Hợp tác với nhóm shipper hoặc shop giao hàng nhỏ, đo thời gian giao hàng trước/sau, Smart Meet basic \\[6pt]
+12+ tháng & Mở rộng thương mại & B2B API/dashboard cho logistics, booking marketplace, quảng cáo ngữ cảnh, partnership với food/platform \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
 %% ============================================================
 %% PHẦN VI: PHÂN CÔNG NHIỆM VỤ
